@@ -72,8 +72,8 @@ __global__ void kernelRenderParticles() {
   if (index >= cuConstRendererParams.numberOfParticles)
       return;
 
-  int index2 = 2 * index;
-  int index4 = 4 * index;
+  //int index2 = 2 * index;
+  //int index4 = 4 * index;
 
   float2 p = *(float2*)(&cuConstRendererParams.position[index]);
 
@@ -85,16 +85,6 @@ __global__ void kernelRenderParticles() {
   *imgPtr = ((float4*)(&cuConstRendererParams.color))[index];
 }
 
-void
-SimRenderer::advanceAnimation() {
-   // 256 threads per block is a healthy number
-  dim3 blockDim(256, 1);
-  dim3 gridDim((cuConstRendererParams.numberOfParticles + blockDim.x - 1) / blockDim.x);
-
-  kernelBasic<<<gridDim, blockDim>>>();
-
-  cudaDeviceSynchronize();
-}
 
 void SimRenderer::clearImage() {
     // 256 threads per block is a healthy number
@@ -112,7 +102,7 @@ SimRenderer::SimRenderer() {
   image = NULL;
   benchmark = SIMPLE;
 
-  numParticles = 0;
+  numberOfParticles = 0;
 
   cudaDevicePosition = NULL;
   cudaDeviceVelocity = NULL;
@@ -158,7 +148,7 @@ SimRenderer::getImage() {
 
 void
 SimRenderer::loadScene(Benchmark bm) {
-  loadParticleScene(bm, cuConstRendererParams.numberOfParticles, position, velocity, color);
+  loadParticleScene(bm, numberOfParticles, position, velocity, color);
 }
 
 void
@@ -201,7 +191,6 @@ SimRenderer::setup() {
   //
   // See the CUDA Programmer's Guide for descriptions of
   // cudaMalloc and cudaMemcpy
-  int numberOfParticles = cuConstRendererParams.numberOfParticles;
 
   cudaMalloc(&cudaDevicePosition, sizeof(float) * 2 * numberOfParticles);
   cudaMalloc(&cudaDeviceVelocity, sizeof(float) * 3 * numberOfParticles);
@@ -243,6 +232,17 @@ SimRenderer::setup() {
   cudaMemcpyToSymbol(cuConstNoiseYPermutationTable, permY, sizeof(int) * 256);
   cudaMemcpyToSymbol(cuConstNoise1DValueTable, value1D, sizeof(float) * 256);
   */
+}
+
+void
+SimRenderer::advanceAnimation() {
+   // 256 threads per block is a healthy number
+  dim3 blockDim(256, 1);
+  dim3 gridDim((numberOfParticles + blockDim.x - 1) / blockDim.x);
+
+  kernelBasic<<<gridDim, blockDim>>>();
+
+  cudaDeviceSynchronize();
 }
 
 void

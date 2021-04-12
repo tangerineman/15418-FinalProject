@@ -10,7 +10,7 @@ private:
     Image* image;
     Benchmark benchmark;
 
-    int numParticles;
+    int numberOfParticles;
 
     float* position;
     float* velocity;
