@@ -52,6 +52,9 @@ __global__ void kernelBasic() {
   float* velocity = cuConstRendererParams.velocity;
   float* position = cuConstRendererParams.position;
 
+  int w = cuConstRendererParams.imageWidth;
+  int h = cuConstRendererParams.imageHeight;
+
   int index = blockIdx.x * blockDim.x + threadIdx.x;
   if (index >= cuConstRendererParams.numberOfParticles || index < 0)
       return;
@@ -60,7 +63,15 @@ __global__ void kernelBasic() {
   int vIdx = index * 2;
 
   position[pIdx] += velocity[vIdx] * dt;
+  if(ceil(position[pIdx]) <= 0 || ceil(position[pIdx]) >= w-1) {
+    position[pIdx] = (ceil(position[pIdx]) <= 0) ? 0.f : (float) w-1;
+    velocity[pIdx] *= -1.f;
+  }
   position[pIdx+1] += velocity[vIdx+1] * dt;
+  if(ceil(position[pIdx+1]) <= 0 || ceil(position[pIdx+1]) >= h-1) {
+    velocity[pIdx+1] *= -1.f;
+    position[pIdx+1] = (ceil(position[pIdx+1]) <= 0) ? 0.f : (float) h-1;
+  }
 
   //vel stays the same
 }
@@ -69,20 +80,23 @@ __global__ void kernelRenderParticles() {
   int index = blockIdx.x * blockDim.x + threadIdx.x;
 
 
-  if (index >= cuConstRendererParams.numberOfParticles)
+  if (index >= cuConstRendererParams.numberOfParticles) {
+      //printf("HOW\n");
       return;
-
+  }
   //int index2 = 2 * index;
   //int index4 = 4 * index;
-
-  float2 p = *(float2*)(&cuConstRendererParams.position[index]);
-
+  //printf("oof1\n");
+  float2 p = ((float2*)cuConstRendererParams.position)[index];
   int px = ceil(p.x);
   int py = ceil(p.y);
 
+
   float4* imgPtr = (float4*)(&cuConstRendererParams.imageData[4 * (py * cuConstRendererParams.imageWidth + px)]);
 
-  *imgPtr = ((float4*)(&cuConstRendererParams.color))[index];
+  float4 oof = ((float4*)cuConstRendererParams.color)[index];
+
+  *imgPtr = make_float4(oof.x, oof.y, oof.z, oof.w);//((float4*)(&cuConstRendererParams.color))[index];
 }
 
 
@@ -93,7 +107,7 @@ void SimRenderer::clearImage() {
       (image->width + blockDim.x - 1) / blockDim.x,
       (image->height + blockDim.y - 1) / blockDim.y);
 
-    kernelClearImage<<<gridDim, blockDim>>>(1.f, 1.f, 1.f, 1.f);
+    kernelClearImage<<<gridDim, blockDim>>>(0.f, 0.f, 0.f, 1.f);
 
     cudaDeviceSynchronize();
 }
@@ -142,7 +156,7 @@ SimRenderer::getImage() {
                cudaDeviceImageData,
                sizeof(float) * 4 * image->width * image->height,
                cudaMemcpyDeviceToHost);
-
+    printf("copied\n");
     return image;
 }
 
@@ -197,8 +211,8 @@ SimRenderer::setup() {
   cudaMalloc(&cudaDeviceColor, sizeof(float) * 4 * numberOfParticles);
   cudaMalloc(&cudaDeviceImageData, sizeof(float) * 4 * image->width * image->height);
 
-  cudaMemcpy(cudaDevicePosition, position, sizeof(float) * 3 * numberOfParticles, cudaMemcpyHostToDevice);
-  cudaMemcpy(cudaDeviceVelocity, velocity, sizeof(float) * 3 * numberOfParticles, cudaMemcpyHostToDevice);
+  cudaMemcpy(cudaDevicePosition, position, sizeof(float) * 2 * numberOfParticles, cudaMemcpyHostToDevice);
+  cudaMemcpy(cudaDeviceVelocity, velocity, sizeof(float) * 2 * numberOfParticles, cudaMemcpyHostToDevice);
   cudaMemcpy(cudaDeviceColor, color, sizeof(float) * 4 * numberOfParticles, cudaMemcpyHostToDevice);
 
 
@@ -256,9 +270,13 @@ SimRenderer::allocOutputImage(int width, int height) {
 void
 SimRenderer::render() {
   // 256 threads per block is a healthy number
-  dim3 blockDim(16, 16);
+  dim3 blockDim(256);
   dim3 gridDim(16, 16);
 
   kernelRenderParticles<<<gridDim, blockDim>>>();
-  cudaDeviceSynchronize();
+  //cudaDeviceSynchronize();
+  cudaError_t cudaerr = cudaDeviceSynchronize();
+    if (cudaerr != cudaSuccess)
+        printf("kernel launch failed with error \"%s\".\n",
+               cudaGetErrorString(cudaerr));
 }

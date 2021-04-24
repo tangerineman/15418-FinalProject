@@ -7,6 +7,13 @@
 #include "platformgl.h"
 
 
+typedef struct float4 {
+    float x;
+    float y;
+    float z;
+    float w;
+} float4;
+
 void renderPicture();
 
 
@@ -129,6 +136,17 @@ renderPicture() {
 
   // render the particles< into the image
   gDisplay.renderer->render();
+  printf("DONE RENDERING\n");
+
+  /*const Image* img = gDisplay.renderer->getImage();
+  float4* data4 = (float4*) img->data;
+  for (int i = 0; i < 256; i++) {
+    for (int j = 0; j < 256; j++) {
+      float4 t = data4[i];
+      if(t.x != 0.f)
+        printf("thing pixel at row = %d, col = %d (rgba): %f, %f, %f, %f\n", i, j, t.x, t.y, t.w, t.z);
+    }
+  }*/
 
   double endRenderTime = CycleTimer::currentSeconds();
 
@@ -155,11 +173,15 @@ startRendererWithDisplay(SimRenderer* renderer) {
   gDisplay.height = img->height;
 
   // configure GLUT
-
+  printf("configurng glut...\n");
   glutInitWindowSize(gDisplay.width, gDisplay.height);
   glutInitDisplayMode(GLUT_RGBA | GLUT_DOUBLE);
+  printf("half...\n");
   glutCreateWindow("CMU 15-418 Assignment 2 - Circle Renderer");
+  printf("half2...\n");
   glutDisplayFunc(handleDisplay);
+  printf("half3...\n");
   glutKeyboardFunc(handleKeyPress);
+  printf("almost...\n");
   glutMainLoop();
 }
