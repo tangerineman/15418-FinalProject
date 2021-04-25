@@ -5,6 +5,8 @@
 void
 loadParticleScene(
     Benchmark benchmark,
+    int width,
+    int height,
     int& numCircles,
     float*& position,
     float*& velocity,

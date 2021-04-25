@@ -13,11 +13,11 @@ private:
     int numberOfParticles;
 
     float* position;
-    float* velocity;
+    float* velField;
     float* color;
 
     float* cudaDevicePosition;
-    float* cudaDeviceVelocity;
+    float* cudaDeviceVelField;
     float* cudaDeviceColor;
     float* cudaDeviceImageData;
     int* cudaDeviceLocks;

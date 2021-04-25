@@ -12,10 +12,10 @@
 struct GlobalConstants {
   Benchmark benchmark;
 
-  int numberOfParticles;
+  float* velField;
 
+  int numberOfParticles;
   float* position;
-  float* velocity;
   float* color;
 
   int imageWidth;
@@ -49,7 +49,7 @@ __global__ void kernelClearImage(float r, float g, float b, float a) {
 __global__ void kernelBasic() {
   const float dt = 1.f / 60.f;
 
-  float* velocity = cuConstRendererParams.velocity;
+  float* velField = cuConstRendererParams.velField;
   float* position = cuConstRendererParams.position;
 
   int w = cuConstRendererParams.imageWidth;
@@ -60,25 +60,97 @@ __global__ void kernelBasic() {
       return;
 
   int pIdx = index * 2;
-  int vIdx = index * 2;
 
-  position[pIdx] += velocity[vIdx] * dt;
+  int currX = position[pIdx];
+  int currY = position[pIdx + 1];
+
+  position[pIdx] += velField[2*(w * currY + currX)] * dt;
+  if(ceil(position[pIdx]) <= 0)
+    position[pIdx] = 0;
+  else if (ceil(position[pIdx]) >= w-1)
+    position[pIdx] = w-1;
+  /*
   if(ceil(position[pIdx]) <= 0 || ceil(position[pIdx]) >= w-1) {
     position[pIdx] = (ceil(position[pIdx]) <= 0) ? 0.f : (float) w-1;
     velocity[pIdx] *= -1.f;
-  }
-  position[pIdx+1] += velocity[vIdx+1] * dt;
+  }*/
+  position[pIdx+1] += velField[2*(w * currY + currX) + 1] * dt;
+  if(ceil(position[pIdx+1]) <= 0)
+    position[pIdx+1] = 0;
+  else if (ceil(position[pIdx+1]) >= h-1)
+    position[pIdx+1] = h-1;
+  /*
   if(ceil(position[pIdx+1]) <= 0 || ceil(position[pIdx+1]) >= h-1) {
     velocity[pIdx+1] *= -1.f;
     position[pIdx+1] = (ceil(position[pIdx+1]) <= 0) ? 0.f : (float) h-1;
-  }
+  }*/
 
   //vel stays the same
 }
 
+__device__ float dp(float2 a, float2 b) {
+  return a.x * b.x + a.y * b.y;
+}
+
+__device__ float2 f2add(float2 a, float2 b) {
+  return make_float2(a.x + b.x, a.y + b.y);
+}
+
+__global__ void kernelVelFieldCopy(float2* newVelField) {
+  uint col = (blockIdx.x * blockDim.x) + threadIdx.x;
+  uint row = (blockIdx.y * blockDim.y) + threadIdx.y;
+
+  int h = cuConstRendererParams.imageHeight;
+  int w = cuConstRendererParams.imageWidth;
+
+  int index = row * w + col;
+
+  cuConstRendererParams.velField[2*index] = newVelField[index].x;
+  cuConstRendererParams.velField[2*index+1] = newVelField[index].y;
+}
+
+__global__ void kernelUpdateVectorField(float2* newVelField) {
+  uint col = (blockIdx.x * blockDim.x) + threadIdx.x;
+  uint row = (blockIdx.y * blockDim.y) + threadIdx.y;
+
+  int h = cuConstRendererParams.imageHeight;
+  int w = cuConstRendererParams.imageWidth;
+
+  int index = row * w + col;
+
+  float2* velField2 = (float2*) cuConstRendererParams.velField;
+
+  float2 curr = velField2[index];
+
+  float2 topLeft = velField2[index - w - 1];
+  float2 top = velField2[index - w];
+  float2 topRight = velField2[index - w + 1];
+  float2 left = velField2[index - 1];
+  float2 right = velField2[index + 1];
+  float2 botLeft = velField2[index + w - 1];
+  float2 bot = velField2[index + w];
+  float2 botRight = velField2[index + w + 1];
+
+  float2 newVel;
+
+  newVel.x =  curr.x + (dp(f2add(topLeft, botRight), make_float2(1.f, 1.f)) + dp(f2add(botLeft, topRight), make_float2(1.f, -1.f)) + 2.f * (left.x + right.x - top.x - bot.x) + curr.x * -4.f) / 8.f;
+  newVel.y = curr.y + (dp(f2add(topLeft, botRight), make_float2(1.f, 1.f)) - dp(f2add(botLeft, topRight), make_float2(1.f, -1.f)) + -2.f * (left.y + right.y - top.y - bot.y) + curr.y * -4.f) / 8.f;
+
+  if(row == 0) {
+    newVelField[index] = make_float2(0.f, 60.f);
+  } else if (col == 0) {
+    newVelField[index] = make_float2(60.f, 0.f);
+  } else if (row == h-1) {
+    newVelField[index] = make_float2(0.f, -60.f);
+  } else if (col == w-1) {
+    newVelField[index] = make_float2(-60.f, 0.f);
+  } else {
+    newVelField[index] = newVel;
+  }
+}
+
 __global__ void kernelRenderParticles() {
   int index = blockIdx.x * blockDim.x + threadIdx.x;
-
 
   if (index >= cuConstRendererParams.numberOfParticles) {
       //printf("HOW\n");
@@ -119,7 +191,7 @@ SimRenderer::SimRenderer() {
   numberOfParticles = 0;
 
   cudaDevicePosition = NULL;
-  cudaDeviceVelocity = NULL;
+  cudaDeviceVelField = NULL;
   cudaDeviceColor = NULL;
   cudaDeviceImageData = NULL;
 }
@@ -132,13 +204,13 @@ SimRenderer::~SimRenderer() {
 
   if (position) {
     delete [] position;
-    delete [] velocity;
+    delete [] velField;
     delete [] color;
   }
 
   if (cudaDevicePosition) {
     cudaFree(cudaDevicePosition);
-    cudaFree(cudaDeviceVelocity);
+    cudaFree(cudaDeviceVelField);
     cudaFree(cudaDeviceColor);
     cudaFree(cudaDeviceImageData);
   }
@@ -162,7 +234,7 @@ SimRenderer::getImage() {
 
 void
 SimRenderer::loadScene(Benchmark bm) {
-  loadParticleScene(bm, numberOfParticles, position, velocity, color);
+  loadParticleScene(bm, image->width, image->height, numberOfParticles, position, velField, color);
 }
 
 void
@@ -207,12 +279,12 @@ SimRenderer::setup() {
   // cudaMalloc and cudaMemcpy
 
   cudaMalloc(&cudaDevicePosition, sizeof(float) * 2 * numberOfParticles);
-  cudaMalloc(&cudaDeviceVelocity, sizeof(float) * 3 * numberOfParticles);
+  cudaMalloc(&cudaDeviceVelField, sizeof(float) * 2 * image->width * image->height);
   cudaMalloc(&cudaDeviceColor, sizeof(float) * 4 * numberOfParticles);
   cudaMalloc(&cudaDeviceImageData, sizeof(float) * 4 * image->width * image->height);
 
   cudaMemcpy(cudaDevicePosition, position, sizeof(float) * 2 * numberOfParticles, cudaMemcpyHostToDevice);
-  cudaMemcpy(cudaDeviceVelocity, velocity, sizeof(float) * 2 * numberOfParticles, cudaMemcpyHostToDevice);
+  cudaMemcpy(cudaDeviceVelField, velField, sizeof(float) * 2 * image->width * image->height, cudaMemcpyHostToDevice);
   cudaMemcpy(cudaDeviceColor, color, sizeof(float) * 4 * numberOfParticles, cudaMemcpyHostToDevice);
 
 
@@ -230,7 +302,7 @@ SimRenderer::setup() {
   params.imageWidth = image->width;
   params.imageHeight = image->height;
   params.position = cudaDevicePosition;
-  params.velocity = cudaDeviceVelocity;
+  params.velField = cudaDeviceVelField;
   params.color = cudaDeviceColor;
   params.imageData = cudaDeviceImageData;
 
@@ -270,12 +342,33 @@ SimRenderer::allocOutputImage(int width, int height) {
 void
 SimRenderer::render() {
   // 256 threads per block is a healthy number
-  dim3 blockDim(256);
-  dim3 gridDim(16, 16);
+  dim3 blockDimVec(8, 8);
+  dim3 gridDimVec(64, 64);
+  dim3 blockDimParticles(256);
+  dim3 gridDimParticles(16, 16);
 
-  kernelRenderParticles<<<gridDim, blockDim>>>();
-  //cudaDeviceSynchronize();
+  float2* cudaDeviceVelFieldUpdated;
+
+  cudaMalloc(&cudaDeviceVelFieldUpdated, sizeof(float) * 2 * image->width * image->height);
+
+  for(int i = 0; i < 50; i++) {
+    kernelUpdateVectorField<<<gridDimVec, blockDimVec>>>(cudaDeviceVelFieldUpdated);
+    cudaDeviceSynchronize();
+    kernelVelFieldCopy<<<gridDimVec, blockDimVec>>>(cudaDeviceVelFieldUpdated);
+    cudaDeviceSynchronize();
+    //cudaMemcpy(cuConstRendererParams.velField, cudaDeviceVelFieldUpdated, sizeof(float) * 2 * image->width * image->height, cudaMemcpyDeviceToDevice);
+  }
+
+  cudaFree(cudaDeviceVelFieldUpdated);
+
   cudaError_t cudaerr = cudaDeviceSynchronize();
+    if (cudaerr != cudaSuccess)
+        printf("kernel launch failed with error \"%s\".\n",
+               cudaGetErrorString(cudaerr));
+
+  kernelRenderParticles<<<gridDimParticles, blockDimParticles>>>();
+  //cudaDeviceSynchronize();
+  cudaerr = cudaDeviceSynchronize();
     if (cudaerr != cudaSuccess)
         printf("kernel launch failed with error \"%s\".\n",
                cudaGetErrorString(cudaerr));
