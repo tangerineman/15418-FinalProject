@@ -20,10 +20,14 @@ int main(int argc, char** argv) {
 
   SimRenderer* sim_renderer = new SimRenderer();
 
-  if (benchmarkStr.compare("simple") == 0) {
-    bm = SIMPLE;
+  if (benchmarkStr.compare("stream1") == 0) {
+    bm = STREAM1;
+  } else if (benchmarkStr.compare("stream2") == 0) {
+    bm = STREAM2;
+  } else if (benchmarkStr.compare("circle") == 0) {
+    bm = CIRCLE;
   } else {
-    bm = COMPLEX;
+    bm = STREAM1;
   }
 
   printf("allocating scene and stuff...\n");

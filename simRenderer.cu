@@ -96,6 +96,10 @@ __device__ float2 f2add(float2 a, float2 b) {
   return make_float2(a.x + b.x, a.y + b.y);
 }
 
+__device__ float2 f2sub(float2 a, float2 b) {
+  return make_float2(a.x - b.x, a.y - b.y);
+}
+
 __global__ void kernelVelFieldCopy(float2* newVelField) {
   uint col = (blockIdx.x * blockDim.x) + threadIdx.x;
   uint row = (blockIdx.y * blockDim.y) + threadIdx.y;
@@ -122,31 +126,45 @@ __global__ void kernelUpdateVectorField(float2* newVelField) {
 
   float2 curr = velField2[index];
 
-  float2 topLeft = velField2[index - w - 1];
-  float2 top = velField2[index - w];
-  float2 topRight = velField2[index - w + 1];
-  float2 left = velField2[index - 1];
-  float2 right = velField2[index + 1];
-  float2 botLeft = velField2[index + w - 1];
-  float2 bot = velField2[index + w];
-  float2 botRight = velField2[index + w + 1];
+  float2 zero = make_float2(0.f, 0.f);
+
+  float2 topLeft = (row == 0 || col == 0) ? zero : velField2[index - w - 1];
+  float2 top = (row == 0) ? zero : velField2[index - w];
+  float2 topRight = (row == 0 || col == (w-1)) ? zero : velField2[index - w + 1];
+  float2 left = (col == 0) ? zero : velField2[index - 1];
+  float2 right = (col == (w-1)) ? zero : velField2[index + 1];
+  float2 botLeft = (row == (h-1) || col == 0) ? zero : velField2[index + w - 1];
+  float2 bot = (row == (h-1)) ? zero : velField2[index + w];
+  float2 botRight = (row == (h-1) || col == (w-1)) ? zero : velField2[index + w + 1];
 
   float2 newVel;
 
-  newVel.x =  curr.x + (dp(f2add(topLeft, botRight), make_float2(1.f, 1.f)) + dp(f2add(botLeft, topRight), make_float2(1.f, -1.f)) + 2.f * (left.x + right.x - top.x - bot.x) + curr.x * -4.f) / 8.f;
-  newVel.y = curr.y + (dp(f2add(topLeft, botRight), make_float2(1.f, 1.f)) - dp(f2add(botLeft, topRight), make_float2(1.f, -1.f)) + -2.f * (left.y + right.y - top.y - bot.y) + curr.y * -4.f) / 8.f;
+  newVel.x =  curr.x +
+              (dp(f2add(topLeft, botRight), make_float2(1.f, 1.f)) +
+               dp(f2add(botLeft, topRight), make_float2(1.f, -1.f)) +
+               2 * dp(f2sub(f2add(left, right), f2add(top, bot)), make_float2(2.f, -2.f)) +
+               curr.x * -4.f) / 8.f;
+  newVel.y = curr.y +
+             (dp(f2add(topLeft, botRight), make_float2(1.f, 1.f)) -
+              dp(f2add(botLeft, topRight), make_float2(1.f, -1.f)) -
+              -2 * dp(f2sub(f2add(left, right), f2add(top, bot)), make_float2(2.f, -2.f)) +
+              curr.y * -4.f) / 8.f;
 
+
+  //curr.y + (dp(f2add(topLeft, botRight), make_float2(1.f, 1.f)) - dp(f2add(botLeft, topRight), make_float2(1.f, -1.f)) + -2.f * (left.y + right.y - top.y - bot.y) + curr.y * -4.f) / 8.f;
+  /*
   if(row == 0) {
-    newVelField[index] = make_float2(0.f, 60.f);
+    newVelField[index] = make_float2(0.f, 10.f);
   } else if (col == 0) {
-    newVelField[index] = make_float2(60.f, 0.f);
+    newVelField[index] = make_float2(10.f, 0.f);
   } else if (row == h-1) {
-    newVelField[index] = make_float2(0.f, -60.f);
+    newVelField[index] = make_float2(0.f, -10.f);
   } else if (col == w-1) {
-    newVelField[index] = make_float2(-60.f, 0.f);
+    newVelField[index] = make_float2(-10.f, 0.f);
   } else {
     newVelField[index] = newVel;
-  }
+  }*/
+  newVelField[index] = newVel;
 }
 
 __global__ void kernelRenderParticles() {
@@ -186,7 +204,7 @@ void SimRenderer::clearImage() {
 
 SimRenderer::SimRenderer() {
   image = NULL;
-  benchmark = SIMPLE;
+  benchmark = STREAM1;
 
   numberOfParticles = 0;
 
@@ -351,7 +369,7 @@ SimRenderer::render() {
 
   cudaMalloc(&cudaDeviceVelFieldUpdated, sizeof(float) * 2 * image->width * image->height);
 
-  for(int i = 0; i < 50; i++) {
+  for(int i = 0; i < 30; i++) {
     kernelUpdateVectorField<<<gridDimVec, blockDimVec>>>(cudaDeviceVelFieldUpdated);
     cudaDeviceSynchronize();
     kernelVelFieldCopy<<<gridDimVec, blockDimVec>>>(cudaDeviceVelFieldUpdated);

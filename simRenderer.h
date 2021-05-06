@@ -1,8 +1,9 @@
 struct Image;
 
 typedef enum {
-    SIMPLE,
-    COMPLEX
+    STREAM1,
+    STREAM2,
+    CIRCLE
 } Benchmark;
 
 class SimRenderer {
