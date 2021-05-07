@@ -16,11 +16,12 @@ int main(int argc, char** argv) {
   Benchmark bm;
   int imageSize = 512;
 
-  benchmarkStr = argv[1];
+  if (argc > 1) benchmarkStr = argv[1];
 
   SimRenderer* sim_renderer = new SimRenderer();
 
-  if (benchmarkStr.compare("stream1") == 0) {
+  if (argc > 1){
+    if (benchmarkStr.compare("stream1") == 0) {
     bm = STREAM1;
   } else if (benchmarkStr.compare("stream2") == 0) {
     bm = STREAM2;
@@ -29,6 +30,9 @@ int main(int argc, char** argv) {
   } else {
     bm = STREAM1;
   }
+  }
+  else bm = STREAM1;
+
 
   printf("allocating scene and stuff...\n");
   sim_renderer->allocOutputImage(imageSize, imageSize);
