@@ -532,7 +532,7 @@ SimRenderer::getImage() {
 
 void
 SimRenderer::loadScene(Benchmark bm) {
-  loadParticleScene(bm, image->width, image->height, initNumParticles, position, velField, color);
+  loadParticleScene(bm, image->width, image->height, initNumParticles, position, velField, color, isDynamic);
 }
 
 void
@@ -660,9 +660,13 @@ SimRenderer::render() {
   dim3 blockDimParticles(256);
   dim3 gridDimParticles(16, 16);
 
-//   int numToSpawn = 10;
-//   kernelSpawnRandParticles<<<1, 1>>>(numToSpawn);
-//   currNumParticles += numToSpawn;
+
+  if (isDynamic){
+    int numToSpawn = 10;
+    kernelSpawnRandParticles<<<1, 1>>>(numToSpawn);
+    currNumParticles += numToSpawn;
+  }
+  
   cudaerr = cudaDeviceSynchronize();
     if (cudaerr != cudaSuccess)
         printf("kernelSpawnRandParticles launch failed with error \"%s\".\n",

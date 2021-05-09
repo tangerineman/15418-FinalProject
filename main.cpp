@@ -31,15 +31,18 @@ int main(int argc, char** argv) {
   } else if (benchmarkStr.compare("circle") == 0) {
     bm = CIRCLE;
     printf("circle\n");
-  } else if (benchmarkStr.compare("linked_list") == 0) {
-    bm = LINKED_LIST;
-    printf("linked_list\n");
+  } else if (benchmarkStr.compare("dyn1") == 0) {
+    bm = DYN1;
+    printf("dyn1\n");
   } else {
     bm = STREAM1;
     printf("stream1\n");
   }
   }
-  else bm = STREAM1;
+  else {
+      bm = STREAM1;
+      printf("Running benchmark: stream1\n");
+  }
 
 
 

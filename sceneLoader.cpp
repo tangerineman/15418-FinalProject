@@ -17,7 +17,8 @@ void loadParticleScene(
     int& numParticles,
     float*& position,
     float*& velField,
-    float*& color)
+    float*& color,
+    bool*& isDynamic)
 {
   printf("in loadParticleScene...\n");
   if (benchmark == STREAM1) {
@@ -26,6 +27,9 @@ void loadParticleScene(
     position = new float[2*numParticles];
     velField = new float[2*width*height];
     color = new float[4*numParticles];
+
+    isDynamic = new bool;
+    *isDynamic = false;
 
     int stream_height = 5;
     int stream_start_y = (height-stream_height)/2;
@@ -63,6 +67,9 @@ void loadParticleScene(
     position = new float[2*numParticles];
     velField = new float[2*width*height];
     color = new float[4*numParticles];
+
+    isDynamic = new bool;
+    *isDynamic = false;
 
     int stream_height = 5;
     int stream_start_y = (height-stream_height)/2;
@@ -113,6 +120,9 @@ void loadParticleScene(
     position = new float[2*numParticles];
     velField = new float[2*width*height];
     color = new float[4*numParticles];
+
+    isDynamic = new bool;
+    *isDynamic = false;
 
     for(int i = 0; i < numParticles; i++) {
       int id2 = i * 2;
@@ -172,21 +182,16 @@ void loadParticleScene(
         }
       }
     }
-  } else if (benchmark == LINKED_LIST){
+  } else if (benchmark == DYN1){
 
       numParticles = 0;
-      position = new float;
+      position = new float[2*width*height];
       color = new float;
       velField = new float[2*width*height];
-      
+      isDynamic = new bool;
+      *isDynamic = true;
 
-      // for(int j = 0; j < height; j++) {
-      //   for(int k = 0; k < width; k++) {
-      //     velField[(j*width + k) * 2] = 250.f;
-      //     velField[(j*width + k) * 2 + 1] = 250.f;
-      //   }
-      // }
-
+      // place spawners
 
       for(int j = 0; j < height; j++) {
         for(int k = 0; k < width; k++) {

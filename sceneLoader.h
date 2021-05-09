@@ -10,6 +10,7 @@ loadParticleScene(
     int& numCircles,
     float*& position,
     float*& velocity,
-    float*& color);
+    float*& color,
+    bool*& isDynamic);
 
 #endif

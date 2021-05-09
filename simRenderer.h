@@ -4,7 +4,7 @@ typedef enum {
     STREAM1,
     STREAM2,
     CIRCLE,
-    LINKED_LIST
+    DYN1
 } Benchmark;
 
 
@@ -36,6 +36,8 @@ private:
     Benchmark benchmark;
 
     int initNumParticles;
+
+    bool *isDynamic;
 
     float* position;
     float* velField;
