@@ -6,6 +6,29 @@ typedef enum {
     CIRCLE
 } Benchmark;
 
+
+class Node {
+public:
+    Node *prev;
+    Node *next;
+
+    float x;
+    float y;
+
+    float r;
+    float g;
+    float b;
+    float a; 
+};
+
+class List {
+public:
+    Node *head;
+    Node *tail;
+    int size;
+};
+
+
 class SimRenderer {
 private:
     Image* image;
@@ -22,6 +45,8 @@ private:
     float* cudaDeviceColor;
     float* cudaDeviceImageData;
     int* cudaDeviceLocks;
+
+    List* cudaDeviceParticleList;
 
 public:
     SimRenderer();

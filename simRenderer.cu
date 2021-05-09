@@ -8,7 +8,6 @@
 #include "sceneLoader.h"
 
 #include "image.h"
-#include "linked_list.h"
 
 struct GlobalConstants {
   Benchmark benchmark;
@@ -21,12 +20,120 @@ struct GlobalConstants {
   float* imageData;
 
   int* locks;
-  List* particleList;
   float* initial_positions; // array of positions of particles that are pregenerated
   float* initial_colors;    // array of colors for particles that are pregenerated
 };
 
 __constant__ GlobalConstants cuConstRendererParams;
+
+// linked list kernels
+////////////////////////////////////////////////////////////////////////////////
+__device__ List* particleList;
+
+
+// returns empty linked list with just a head (head contains no information)
+__device__ List *linked_list_init(){
+
+  List *newList = new(List);
+  
+  Node *newNode = new (Node);
+  newNode->next = NULL;
+  newNode->prev = NULL;
+  newNode->x = 0;
+  newNode->y = 0;
+  newNode->r = 0;
+  newNode->g = 0;
+  newNode->b = 0;
+  newNode->a = 0;
+
+  newList->head = newNode;
+  newList->tail = newNode;
+  newList->size = 1;
+  
+  return newList;
+}
+
+// inserts a node at the tail of the linked list
+__device__ void insert_node(List* list, float x, float y, float r, float g, float b, float a){
+
+  Node *newNode = new (Node);
+
+  newNode->prev = list->tail;
+  newNode->next = NULL;
+  newNode->x = x;
+  newNode->y = y;
+  
+  newNode->r = r;
+  newNode->g = g;
+  newNode->b = b;
+  newNode->a = a; 
+
+  if (list == NULL) printf("ERROR: NULL LIST IN INSERT_NODE\n");
+  else if (list->tail == NULL) printf("ERROR: NULL LIST->NEXT IN INSERT_NODE\n");
+  list->tail->next = newNode;
+  list->tail = newNode;
+  list->size++;
+  // printf("size = %d", list->size);
+  return;
+
+}
+
+
+__device__ void kernelAddParticle(float x, float y, float r, float g, float b, float a){
+  
+  if (blockIdx.x * blockDim.x + threadIdx.x == 0){
+    insert_node(particleList, x, y, r, g, b, a);
+  }
+}
+
+
+// creates a linked list using the initial position and color arrays in global constants
+__global__ void kernelCreateLinkedList() {
+ 
+  if (blockIdx.x * blockDim.x + threadIdx.x == 0) {
+    printf("top of if\n");
+    List *newList = linked_list_init();
+
+    printf("Newlist = %p\n", (void*)newList);
+    printf("cuConstRendererParams.particleList = %p\n", particleList);
+    particleList = newList;
+    
+    printf("after init\n");
+    printf("THREAD: %d\n", blockIdx.x * blockDim.x + threadIdx.x);
+    float* positions = cuConstRendererParams.initial_positions;
+    float* colors = cuConstRendererParams.initial_colors;
+
+    for (int i = 0; i < cuConstRendererParams.numberOfParticles; i++){
+
+      int posIndex = 2 * i;
+      int colIndex = 4 * i;
+
+      float2 pos = make_float2(positions[posIndex], positions[posIndex + 1]);
+      float4 color = make_float4(colors[colIndex], colors[colIndex+1],
+                                  colors[colIndex+2], colors[colIndex+3]);
+                  
+      kernelAddParticle(pos.x, pos.y, color.x, color.y, color.z, color.w);
+      // printf("size = %d\n", cuConstRendererParams.particleList->size);
+    }
+
+  }
+  printf("done\n");
+  return;
+}
+
+
+
+__global__ void freeLinkedList() {
+
+}
+
+////////////////////////////////////////////////////////////////////////////////
+
+
+
+
+
+
 
 __global__ void kernelClearImage(float r, float g, float b, float a) {
   int imageX = blockIdx.x * blockDim.x + threadIdx.x;
@@ -55,8 +162,6 @@ __global__ void kernelBasic() {
 
   int w = cuConstRendererParams.imageWidth;
   int h = cuConstRendererParams.imageHeight;
-
-  List *particleList = cuConstRendererParams.particleList;
 
   Node *currNode = particleList->head->next;
   unsigned int thrId = blockIdx.x * blockDim.x + threadIdx.x;
@@ -168,8 +273,7 @@ __global__ void kernelUpdateVectorField(float2* newVelField) {
 }
 
 __global__ void kernelRenderParticles() {
-  printf("KERNEL RENDER PARTICLES\n");
-  List *particleList = cuConstRendererParams.particleList;
+  // printf("KERNEL RENDER PARTICLES\n");
 
   Node *currNode = particleList->head->next;
   unsigned int thrId = blockIdx.x * blockDim.x + threadIdx.x;
@@ -197,50 +301,7 @@ __global__ void kernelRenderParticles() {
 
 
 
-// linked list kernels
-////////////////////////////////////////////////////////////////////////////////
 
-
-__device__ void kernelAddParticle(float x, float y, float r, float g, float b, float a){
-  
-  if (threadIdx.x == 0){
-    insert_node(cuConstRendererParams.particleList, x, y, r, g, b, a);
-  }
-}
-
-
-// creates a linked list using the initial position and color arrays in global constants
-__global__ void kernelCreateLinkedList() {
-  printf("THREAD: %d\n", blockIdx.x * blockDim.x + threadIdx.x);
-  if (threadIdx.x == 0) {
-    cuConstRendererParams.particleList = linked_list_init();
-
-    float* positions = cuConstRendererParams.initial_positions;
-    float* colors = cuConstRendererParams.initial_colors;
-
-    for (int i = 0; i < cuConstRendererParams.numberOfParticles; i++){
-
-      int posIndex = 2 * i;
-      int colIndex = 4 * i;
-
-      float2 pos = make_float2(positions[posIndex], positions[posIndex + 1]);
-      float4 color = make_float4(colors[colIndex], colors[colIndex+1],
-                                  colors[colIndex+2], colors[colIndex+3]);
-                  
-      kernelAddParticle(pos.x, pos.y, color.x, color.y, color.z, color.w);
-      printf("size = %d\n", cuConstRendererParams.particleList->size);
-    }
-
-  }
-}
-
-
-
-__global__ void freeLinkedList() {
-
-}
-
-////////////////////////////////////////////////////////////////////////////////
 
 void SimRenderer::clearImage() {
     // 256 threads per block is a healthy number
@@ -359,7 +420,8 @@ SimRenderer::setup() {
   cudaMemcpy(cudaDeviceColor, color, sizeof(float) * 4 * numberOfParticles, cudaMemcpyHostToDevice);
   cudaMemcpy(cudaDevicePosition, position, sizeof(float) * 2 * numberOfParticles, cudaMemcpyHostToDevice);
 
-
+  cudaMalloc(&particleList, sizeof(List*));
+  
   // Initialize parameters in constant memory.  We didn't talk about
   // constant memory in class, but the use of read-only constant
   // memory here is an optimization over just sticking these values
@@ -380,11 +442,11 @@ SimRenderer::setup() {
 
   cudaMemcpyToSymbol(cuConstRendererParams, &params, sizeof(GlobalConstants));
 
-  kernelCreateLinkedList<<<32, 1>>>();
+  kernelCreateLinkedList<<<1, 1>>>();
 
   cudaError_t cudaerr = cudaDeviceSynchronize();
     if (cudaerr != cudaSuccess)
-        printf("kernel launch failed with error \"%s\".\n",
+        printf("kernelCreateLinkedList launch failed with error \"%s\".\n",
                cudaGetErrorString(cudaerr));
 
   /*
@@ -428,20 +490,27 @@ SimRenderer::render() {
   dim3 gridDimParticles(16, 16);
 
   float2* cudaDeviceVelFieldUpdated;
-
+  cudaError_t cudaerr;
   cudaMalloc(&cudaDeviceVelFieldUpdated, sizeof(float) * 2 * image->width * image->height);
 
   for(int i = 0; i < 30; i++) {
     kernelUpdateVectorField<<<gridDimVec, blockDimVec>>>(cudaDeviceVelFieldUpdated);
-    cudaDeviceSynchronize();
+    cudaerr = cudaDeviceSynchronize();
+    if (cudaerr != cudaSuccess)
+        printf("kernelUpdateVectorField launch failed with error \"%s\".\n",
+               cudaGetErrorString(cudaerr));
+
     kernelVelFieldCopy<<<gridDimVec, blockDimVec>>>(cudaDeviceVelFieldUpdated);
-    cudaDeviceSynchronize();
+    cudaerr = cudaDeviceSynchronize();
+    if (cudaerr != cudaSuccess)
+        printf("kernelVelFieldCopy launch failed with error \"%s\".\n",
+               cudaGetErrorString(cudaerr));
     //cudaMemcpy(cuConstRendererParams.velField, cudaDeviceVelFieldUpdated, sizeof(float) * 2 * image->width * image->height, cudaMemcpyDeviceToDevice);
   }
 
   cudaFree(cudaDeviceVelFieldUpdated);
 
-  cudaError_t cudaerr = cudaDeviceSynchronize();
+  cudaerr = cudaDeviceSynchronize();
     if (cudaerr != cudaSuccess)
         printf("kernel launch failed with error \"%s\".\n",
                cudaGetErrorString(cudaerr));

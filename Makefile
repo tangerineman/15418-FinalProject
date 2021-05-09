@@ -26,7 +26,7 @@ LDFRAMEWORKS := $(addprefix -framework , $(FRAMEWORKS))
 
 NVCC=nvcc
 
-OBJS=$(OBJDIR)/main.o $(OBJDIR)/display.o $(OBJDIR)/linked_list.o $(OBJDIR)/simRenderer.o $(OBJDIR)/sceneLoader.o
+OBJS=$(OBJDIR)/main.o $(OBJDIR)/display.o $(OBJDIR)/simRenderer.o $(OBJDIR)/sceneLoader.o
 
 
 .PHONY: dirs clean
