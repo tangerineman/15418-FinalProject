@@ -2,7 +2,6 @@
 #include <stdio.h>
 #include <getopt.h>
 #include <string>
-
 #include "simRenderer.h"
 #include "platformgl.h"
 
@@ -20,20 +19,28 @@ int main(int argc, char** argv) {
 
   SimRenderer* sim_renderer = new SimRenderer();
 
+  
   if (argc > 1){
+    printf("Running benchmark: ");
     if (benchmarkStr.compare("stream1") == 0) {
     bm = STREAM1;
+    printf("stream1\n");
   } else if (benchmarkStr.compare("stream2") == 0) {
     bm = STREAM2;
+    printf("stream2\n");
   } else if (benchmarkStr.compare("circle") == 0) {
     bm = CIRCLE;
-  } else if (benchmarkStr.compare("linked_list")) {
+    printf("circle\n");
+  } else if (benchmarkStr.compare("linked_list") == 0) {
     bm = LINKED_LIST;
+    printf("linked_list\n");
   } else {
     bm = STREAM1;
+    printf("stream1\n");
   }
   }
   else bm = STREAM1;
+
 
 
   printf("allocating scene and stuff...\n");

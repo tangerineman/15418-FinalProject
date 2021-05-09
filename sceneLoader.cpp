@@ -36,7 +36,7 @@ void loadParticleScene(
       int id4 = i * 4;
 
       position[id2] = genRandFloat(0, stream_width);
-      printf("posx: %f\n", position[id2]);
+      // printf("posx: %f\n", position[id2]);
       position[id2+1] = genRandFloat(stream_start_y, stream_start_y+stream_height);
 
       color[id4] = 0.f;
@@ -174,11 +174,40 @@ void loadParticleScene(
     }
   } else if (benchmark == LINKED_LIST){
 
+      numParticles = 0;
+      position = new float;
+      color = new float;
+      velField = new float[2*width*height];
+      
+
+      // for(int j = 0; j < height; j++) {
+      //   for(int k = 0; k < width; k++) {
+      //     velField[(j*width + k) * 2] = 250.f;
+      //     velField[(j*width + k) * 2 + 1] = 250.f;
+      //   }
+      // }
 
 
-
-
-
+      for(int j = 0; j < height; j++) {
+        for(int k = 0; k < width; k++) {
+          if (j < height/2 && k <= width/2) {
+            velField[(j*width + k) * 2] = 250.f;
+            velField[(j*width + k) * 2 + 1] = 0.f;
+          } else if (j > height/2 && k <= width/2) {
+            velField[(j*width + k) * 2] = 0.f;
+            velField[(j*width + k) * 2 + 1] = -250.f;
+          } else if (j <= height/2 && k > width/2) {
+            velField[(j*width + k) * 2] = 0.f;
+            velField[(j*width + k) * 2 + 1] = 250.f;
+          } else if (j >= height/2 &&  k > width/2) {
+            velField[(j*width + k) * 2] = -250.f;
+            velField[(j*width + k) * 2 + 1] = 0.f;
+          } else {
+            velField[(j*width + k) * 2] = 0.f;
+            velField[(j*width + k) * 2 + 1] = 0.f;
+          }
+        }
+      }
       
   }
 }
