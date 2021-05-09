@@ -271,59 +271,175 @@ __global__ void kernelVelFieldCopy(float2* newVelField) {
   cuConstRendererParams.velField[2*index+1] = newVelField[index].y;
 }
 
-__global__ void kernelUpdateVectorField(float2* newVelField) {
-  uint col = (blockIdx.x * blockDim.x) + threadIdx.x;
-  uint row = (blockIdx.y * blockDim.y) + threadIdx.y;
 
-  int h = cuConstRendererParams.imageHeight;
-  int w = cuConstRendererParams.imageWidth;
+__global__ void kernelVecMomentum(float2* newVelField) {
+    uint col = (blockIdx.x * blockDim.x) + threadIdx.x;
+    uint row = (blockIdx.y * blockDim.y) + threadIdx.y;
+  
+    int w = cuConstRendererParams.imageWidth;
+    int h = cuConstRendererParams.imageHeight;
+  
+    int index = row * w + col;
+  
+    float2* velField2 = (float2*) cuConstRendererParams.velField;
+  
+    float2 curr = velField2[index];
+    float2 sum = make_float2(curr.x, curr.y);
+  
+    float2 zero = make_float2(0.f, 0.f);
+  
+    float2 topLeft = (row == 0 || col == 0) ? zero : velField2[index - w - 1];
+    if(topLeft.y == 0.f)
+      topLeft.y = 0.0000001f;
+    float2 top = (row == 0) ? zero : velField2[index - w];
+    if(top.y == 0.f)
+      top.y = 0.0000001f;
+    float2 topRight = (row == 0 || col == (w-1)) ? zero : velField2[index - w + 1];
+    if(topRight.y == 0.f)
+      topRight.y = 0.0000001f;
+    float2 left = (col == 0) ? zero : velField2[index - 1];
+    if(left.y == 0.f)
+      left.y = 0.0000001f;
+    float2 right = (col == (w-1)) ? zero : velField2[index + 1];
+    if(right.y == 0.f)
+      right.y = 0.0000001f;
+    float2 botLeft = (row == (h-1) || col == 0) ? zero : velField2[index + w - 1];
+    if(botLeft.y == 0.f)
+      botLeft.y = 0.0000001f;
+    float2 bot = (row == (h-1)) ? zero : velField2[index + w];
+    if(bot.y == 0.f)
+      bot.y = 0.0000001f;
+    float2 botRight = (row == (h-1) || col == (w-1)) ? zero : velField2[index + w + 1];
+    if(botRight.y == 0.f)
+      botRight.y = 0.0000001f;
+  
+    float counter = 1.f;
+    float atres;
+  
+    atres = atan(topLeft.y / topLeft.x);
+    if(topLeft.x > 0.f && topLeft.y > 0.f && atres > 0.523f && atres < 1.05f) {
+      counter += 1.f;
+      sum = f2add(sum, topLeft);
+    }
+  
+    atres = atan(top.y / top.x);
+    if(top.y > 0.f && atres > 1.05f && atres < 2.09f) {
+      counter += 1.f;
+      sum = f2add(sum, top);
+    }
+  
+    atres = abs(atan(topRight.y / topRight.x));
+    if(topRight.x < 0.f && topRight.y > 0.f && atres > 0.523f && atres < 1.05f) {
+      counter += 1.f;
+      sum = f2add(sum, topRight);
+    }
+  
+    atres = atan(left.y / left.x);
+    if(left.x > 0.f && atres < 1.05f && atres > -1.05f) {
+      counter += 1.f;
+      sum = f2add(sum, left);
+    }
+  
+    atres = atan(right.y / right.x);
+    if(right.x < 0.f && atres < 1.05f && atres > -1.05f) {
+      counter += 1.f;
+      sum = f2add(sum, right);
+    }
+  
+    atres = abs(atan(botLeft.y / botLeft.x));
+    if(botLeft.y < 0.f && botLeft.x > 0.f && atres > 0.523f && atres < 1.05f) {
+      counter += 1.f;
+      sum = f2add(sum, botLeft);
+    }
+  
+    atres = abs(atan(bot.y / bot.x));
+    if(bot.y < 0.f && atres > 1.05f && atres < 2.09f) {
+      counter += 1.f;
+      sum = f2add(sum, bot);
+    }
+  
+    atres = atan(botRight.y / botRight.x);
+    if(botRight.x < 0.f && botRight.y < 0.f && atres > 0.523f && atres < 1.05f) {
+      counter += 1.f;
+      sum = f2add(sum, botRight);
+    }
+  
+    //if(curr.x != 0.f && curr.y != 0.f) {
+    //  printf("curr.x, y: %f, %f, new x, y: %f, %f\n", curr.x, curr.y, sum.x, sum.y);
+    //}
+    //printf("sumx, y; %f, %f, counter: %d\n", sum.x, sum.y, counter);
+  
+    sum.x = counter == 0.f ? 0.f : sum.x / counter;
+    sum.y = counter == 0.f ? 0.f : sum.y / counter;
+    //printf("curr.x, y: %f, %f, new x, y: %f, %f\n", curr.x, curr.y, sum.x, sum.y);
+  
+  
+    newVelField[index] = sum;
+  }
 
-  int index = row * w + col;
-
-  float2* velField2 = (float2*) cuConstRendererParams.velField;
-
-  float2 curr = velField2[index];
-
-  float2 zero = make_float2(0.f, 0.f);
-
-  float2 topLeft = (row == 0 || col == 0) ? zero : velField2[index - w - 1];
-  float2 top = (row == 0) ? zero : velField2[index - w];
-  float2 topRight = (row == 0 || col == (w-1)) ? zero : velField2[index - w + 1];
-  float2 left = (col == 0) ? zero : velField2[index - 1];
-  float2 right = (col == (w-1)) ? zero : velField2[index + 1];
-  float2 botLeft = (row == (h-1) || col == 0) ? zero : velField2[index + w - 1];
-  float2 bot = (row == (h-1)) ? zero : velField2[index + w];
-  float2 botRight = (row == (h-1) || col == (w-1)) ? zero : velField2[index + w + 1];
-
-  float2 newVel;
-
-  newVel.x =  curr.x +
-              (dp(f2add(topLeft, botRight), make_float2(1.f, 1.f)) +
-               dp(f2add(botLeft, topRight), make_float2(1.f, -1.f)) +
-               2 * dp(f2sub(f2add(left, right), f2add(top, bot)), make_float2(2.f, -2.f)) +
-               curr.x * -4.f) / 8.f;
-  newVel.y = curr.y +
-             (dp(f2add(topLeft, botRight), make_float2(1.f, 1.f)) -
-              dp(f2add(botLeft, topRight), make_float2(1.f, -1.f)) -
-              -2 * dp(f2sub(f2add(left, right), f2add(top, bot)), make_float2(2.f, -2.f)) +
-              curr.y * -4.f) / 8.f;
-
-
-  //curr.y + (dp(f2add(topLeft, botRight), make_float2(1.f, 1.f)) - dp(f2add(botLeft, topRight), make_float2(1.f, -1.f)) + -2.f * (left.y + right.y - top.y - bot.y) + curr.y * -4.f) / 8.f;
+  __global__ void kernelUpdateVectorField(float2* newVelField) {
+    uint col = (blockIdx.x * blockDim.x) + threadIdx.x;
+    uint row = (blockIdx.y * blockDim.y) + threadIdx.y;
+  
+    int h = cuConstRendererParams.imageHeight;
+    int w = cuConstRendererParams.imageWidth;
+  
+    int index = row * w + col;
+  
+    float2* velField2 = (float2*) cuConstRendererParams.velField;
+  
+    float2 curr = velField2[index];
+  
+    float2 zero = make_float2(0.f, 0.f);
+  
+    float2 topLeft = (row == 0 || col == 0) ? zero : velField2[index - w - 1];
+    float2 top = (row == 0) ? zero : velField2[index - w];
+    float2 topRight = (row == 0 || col == (w-1)) ? zero : velField2[index - w + 1];
+    float2 left = (col == 0) ? zero : velField2[index - 1];
+    float2 right = (col == (w-1)) ? zero : velField2[index + 1];
+    float2 botLeft = (row == (h-1) || col == 0) ? zero : velField2[index + w - 1];
+    float2 bot = (row == (h-1)) ? zero : velField2[index + w];
+    float2 botRight = (row == (h-1) || col == (w-1)) ? zero : velField2[index + w + 1];
+  
+    float2 newVel;
+  
+    newVel.x = curr.x + (topRight.x + topRight.y + botLeft.x + botLeft.y +
+                         topLeft.x - topLeft.y + botRight.x - botRight.y +
+                         + 2 * (left.x + right.x - top.x - bot.x)
+                         - 4 * curr.x)/8.f;
+  
+     newVel.y = curr.y + (topLeft.x + topLeft.y + botRight.x + botRight.y +
+                          topRight.y - topRight.x + botLeft.y - botLeft.x +
+                          + 2 * (top.y + bot.y - right.y - left.y)
+                          - 4 * curr.y)/8.f;
+    /*
+    newVel.x =  curr.x +
+                (dp(f2add(topLeft, botRight), make_float2(1.f, 1.f)) +
+                 dp(f2add(botLeft, topRight), make_float2(1.f, -1.f)) +
+                 2 * dp(f2sub(f2add(left, right), f2add(top, bot)), make_float2(2.f, -2.f)) +
+                 curr.x * -4.f) / 8.f;
+    newVel.y = curr.y +
+               (dp(f2add(topLeft, botRight), make_float2(1.f, 1.f)) -
+                dp(f2add(botLeft, topRight), make_float2(1.f, -1.f)) -
+                -2 * dp(f2sub(f2add(left, right), f2add(top, bot)), make_float2(2.f, -2.f)) +
+                curr.y * -4.f) / 8.f;*/
+    /*
+    if(row == 258 && curr.x != 0) {
+      printf("\ncurr: %f, %f\ntopLeft: %f, %f\ntop: %f, %f\ntopright: %f, %f\nleft: %f, %f\n, right: %f, %f\nbotleft: %f, %f\nbot: %f, %f\nbotRight: %f, %f\nnew: %f, %f\n",
+      curr.x, curr.y, topLeft.x, topLeft.y,
+      top.x, top.y, topRight.x, topRight.y,
+      left.x, left.y, right.x, right.y,
+      botLeft.x, botLeft.y, bot.x, bot.y,
+      botRight.x, botRight.y, newVel.x, newVel.y);
+    }*/
   /*
-  if(row == 0) {
-    newVelField[index] = make_float2(0.f, 10.f);
-  } else if (col == 0) {
-    newVelField[index] = make_float2(10.f, 0.f);
-  } else if (row == h-1) {
-    newVelField[index] = make_float2(0.f, -10.f);
-  } else if (col == w-1) {
-    newVelField[index] = make_float2(-10.f, 0.f);
-  } else {
+    if(newVel.x == 200.f)
+      printf("row for entering 200: %d, %d\n", row, col);
+    if(row == 253) {
+      printf("newvel (x, y): %f, %f\nprev was : %f, %f", newVel.x, newVel.y, newVelField[index].x, newVelField[index].y);
+    }*/
     newVelField[index] = newVel;
-  }*/
-  newVelField[index] = newVel;
-}
+  }
 
 __global__ void kernelRenderParticles() {
   // printf("KERNEL RENDER PARTICLES\n");
@@ -517,7 +633,8 @@ void
 SimRenderer::advanceAnimation() {
    // 256 threads per block is a healthy number
   dim3 blockDim(256, 1);
-  dim3 gridDim((currNumParticles + blockDim.x - 1) / blockDim.x);
+  int gridDimNum = currNumParticles > initNumParticles? currNumParticles: initNumParticles;
+  dim3 gridDim((gridDimNum + blockDim.x - 1) / blockDim.x);
 
 
   kernelBasic<<<gridDim, blockDim>>>();
@@ -536,15 +653,16 @@ SimRenderer::allocOutputImage(int width, int height) {
 void
 SimRenderer::render() {
   cudaError_t cudaerr;
+  printf("IN RENDERER\n");
   // 256 threads per block is a healthy number
   dim3 blockDimVec(8, 8);
   dim3 gridDimVec(64, 64);
   dim3 blockDimParticles(256);
   dim3 gridDimParticles(16, 16);
 
-  int numToSpawn = 10;
-  kernelSpawnRandParticles<<<1, 1>>>(numToSpawn);
-  currNumParticles += numToSpawn;
+//   int numToSpawn = 10;
+//   kernelSpawnRandParticles<<<1, 1>>>(numToSpawn);
+//   currNumParticles += numToSpawn;
   cudaerr = cudaDeviceSynchronize();
     if (cudaerr != cudaSuccess)
         printf("kernelSpawnRandParticles launch failed with error \"%s\".\n",
@@ -556,18 +674,20 @@ SimRenderer::render() {
 
 
 
-  for(int i = 0; i < 30; i++) {
-    kernelUpdateVectorField<<<gridDimVec, blockDimVec>>>(cudaDeviceVelFieldUpdated);
-    cudaerr = cudaDeviceSynchronize();
-    if (cudaerr != cudaSuccess)
-        printf("kernelUpdateVectorField launch failed with error \"%s\".\n",
-               cudaGetErrorString(cudaerr));
+  cudaMalloc(&cudaDeviceVelFieldUpdated, sizeof(float) * 2 * image->width * image->height);
 
+  printf("IN RENDERER P2\n");
+
+  kernelVecMomentum<<<gridDimVec, blockDimVec>>>(cudaDeviceVelFieldUpdated);
+  cudaDeviceSynchronize();
+  kernelVelFieldCopy<<<gridDimVec, blockDimVec>>>(cudaDeviceVelFieldUpdated);
+  cudaDeviceSynchronize();
+
+  for(int i = 0; i < 1; i++) {
+    kernelUpdateVectorField<<<gridDimVec, blockDimVec>>>(cudaDeviceVelFieldUpdated);
+    cudaDeviceSynchronize();
     kernelVelFieldCopy<<<gridDimVec, blockDimVec>>>(cudaDeviceVelFieldUpdated);
-    cudaerr = cudaDeviceSynchronize();
-    if (cudaerr != cudaSuccess)
-        printf("kernelVelFieldCopy launch failed with error \"%s\".\n",
-               cudaGetErrorString(cudaerr));
+    cudaDeviceSynchronize();
     //cudaMemcpy(cuConstRendererParams.velField, cudaDeviceVelFieldUpdated, sizeof(float) * 2 * image->width * image->height, cudaMemcpyDeviceToDevice);
   }
 
