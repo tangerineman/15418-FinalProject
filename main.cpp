@@ -27,6 +27,8 @@ int main(int argc, char** argv) {
     bm = STREAM2;
   } else if (benchmarkStr.compare("circle") == 0) {
     bm = CIRCLE;
+  } else if (benchmarkStr.compare("linked_list")) {
+    bm = LINKED_LIST;
   } else {
     bm = STREAM1;
   }

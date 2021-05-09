@@ -3,7 +3,8 @@ struct Image;
 typedef enum {
     STREAM1,
     STREAM2,
-    CIRCLE
+    CIRCLE,
+    LINKED_LIST
 } Benchmark;
 
 
@@ -34,7 +35,7 @@ private:
     Image* image;
     Benchmark benchmark;
 
-    int numberOfParticles;
+    int initNumParticles;
 
     float* position;
     float* velField;

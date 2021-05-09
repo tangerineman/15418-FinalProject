@@ -13,7 +13,7 @@ struct GlobalConstants {
   Benchmark benchmark;
 
   float* velField;
-  int numberOfParticles;
+  int initNumParticles;
 
   int imageWidth;
   int imageHeight;
@@ -30,6 +30,7 @@ __constant__ GlobalConstants cuConstRendererParams;
 ////////////////////////////////////////////////////////////////////////////////
 __device__ List* particleList;
 
+__device__ int currNumParticles;
 
 // returns empty linked list with just a head (head contains no information)
 __device__ List *linked_list_init(){
@@ -68,8 +69,8 @@ __device__ void insert_node(List* list, float x, float y, float r, float g, floa
   newNode->b = b;
   newNode->a = a; 
 
-  if (list == NULL) printf("ERROR: NULL LIST IN INSERT_NODE\n");
-  else if (list->tail == NULL) printf("ERROR: NULL LIST->NEXT IN INSERT_NODE\n");
+//   if (list == NULL) printf("ERROR: NULL LIST IN INSERT_NODE\n");
+//   else if (list->tail == NULL) printf("ERROR: NULL LIST->NEXT IN INSERT_NODE\n");
   list->tail->next = newNode;
   list->tail = newNode;
   list->size++;
@@ -83,6 +84,7 @@ __device__ void kernelAddParticle(float x, float y, float r, float g, float b, f
   
   if (blockIdx.x * blockDim.x + threadIdx.x == 0){
     insert_node(particleList, x, y, r, g, b, a);
+    currNumParticles++;
   }
 }
 
@@ -91,19 +93,20 @@ __device__ void kernelAddParticle(float x, float y, float r, float g, float b, f
 __global__ void kernelCreateLinkedList() {
  
   if (blockIdx.x * blockDim.x + threadIdx.x == 0) {
-    printf("top of if\n");
+    // printf("top of if\n");
+    currNumParticles = 0;
     List *newList = linked_list_init();
 
-    printf("Newlist = %p\n", (void*)newList);
-    printf("cuConstRendererParams.particleList = %p\n", particleList);
+    // printf("Newlist = %p\n", (void*)newList);
+    // printf("cuConstRendererParams.particleList = %p\n", particleList);
     particleList = newList;
     
-    printf("after init\n");
-    printf("THREAD: %d\n", blockIdx.x * blockDim.x + threadIdx.x);
+    // printf("after init\n");
+    // printf("THREAD: %d\n", blockIdx.x * blockDim.x + threadIdx.x);
     float* positions = cuConstRendererParams.initial_positions;
     float* colors = cuConstRendererParams.initial_colors;
 
-    for (int i = 0; i < cuConstRendererParams.numberOfParticles; i++){
+    for (int i = 0; i < cuConstRendererParams.initNumParticles; i++){
 
       int posIndex = 2 * i;
       int colIndex = 4 * i;
@@ -112,12 +115,13 @@ __global__ void kernelCreateLinkedList() {
       float4 color = make_float4(colors[colIndex], colors[colIndex+1],
                                   colors[colIndex+2], colors[colIndex+3]);
                   
+        
       kernelAddParticle(pos.x, pos.y, color.x, color.y, color.z, color.w);
       // printf("size = %d\n", cuConstRendererParams.particleList->size);
     }
 
   }
-  printf("done\n");
+//   printf("done\n");
   return;
 }
 
@@ -300,9 +304,6 @@ __global__ void kernelRenderParticles() {
 }
 
 
-
-
-
 void SimRenderer::clearImage() {
     // 256 threads per block is a healthy number
     dim3 blockDim(16, 16, 1);
@@ -319,7 +320,7 @@ SimRenderer::SimRenderer() {
   image = NULL;
   benchmark = STREAM1;
 
-  numberOfParticles = 0;
+  initNumParticles = 0;
 
   cudaDevicePosition = NULL;
   cudaDeviceVelField = NULL;
@@ -366,7 +367,7 @@ SimRenderer::getImage() {
 
 void
 SimRenderer::loadScene(Benchmark bm) {
-  loadParticleScene(bm, image->width, image->height, numberOfParticles, position, velField, color);
+  loadParticleScene(bm, image->width, image->height, initNumParticles, position, velField, color);
 }
 
 void
@@ -410,17 +411,18 @@ SimRenderer::setup() {
   // See the CUDA Programmer's Guide for descriptions of
   // cudaMalloc and cudaMemcpy
 
-  cudaMalloc(&cudaDevicePosition, sizeof(float) * 2 * numberOfParticles);
+  cudaMalloc(&cudaDevicePosition, sizeof(float) * 2 * initNumParticles);
   cudaMalloc(&cudaDeviceVelField, sizeof(float) * 2 * image->width * image->height);
-  cudaMalloc(&cudaDeviceColor, sizeof(float) * 4 * numberOfParticles);
+  cudaMalloc(&cudaDeviceColor, sizeof(float) * 4 * initNumParticles);
   cudaMalloc(&cudaDeviceImageData, sizeof(float) * 4 * image->width * image->height);
 
   cudaMemcpy(cudaDeviceVelField, velField, sizeof(float) * 2 * image->width * image->height, cudaMemcpyHostToDevice);
   
-  cudaMemcpy(cudaDeviceColor, color, sizeof(float) * 4 * numberOfParticles, cudaMemcpyHostToDevice);
-  cudaMemcpy(cudaDevicePosition, position, sizeof(float) * 2 * numberOfParticles, cudaMemcpyHostToDevice);
+  cudaMemcpy(cudaDeviceColor, color, sizeof(float) * 4 * initNumParticles, cudaMemcpyHostToDevice);
+  cudaMemcpy(cudaDevicePosition, position, sizeof(float) * 2 * initNumParticles, cudaMemcpyHostToDevice);
 
   cudaMalloc(&particleList, sizeof(List*));
+  
   
   // Initialize parameters in constant memory.  We didn't talk about
   // constant memory in class, but the use of read-only constant
@@ -432,7 +434,7 @@ SimRenderer::setup() {
 
   GlobalConstants params;
   params.benchmark = benchmark;
-  params.numberOfParticles = numberOfParticles;
+  params.initNumParticles = initNumParticles;
   params.imageWidth = image->width;
   params.imageHeight = image->height;
   params.initial_positions = cudaDevicePosition;
@@ -466,7 +468,10 @@ void
 SimRenderer::advanceAnimation() {
    // 256 threads per block is a healthy number
   dim3 blockDim(256, 1);
-  dim3 gridDim((numberOfParticles + blockDim.x - 1) / blockDim.x);
+  dim3 gridDim((initNumParticles + blockDim.x - 1) / blockDim.x);
+
+  
+
 
   kernelBasic<<<gridDim, blockDim>>>();
 
