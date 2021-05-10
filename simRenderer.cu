@@ -26,7 +26,7 @@ struct GlobalConstants {
 };
 
 __constant__ GlobalConstants cuConstRendererParams;
-__device__ int MAX_PARTICLES;
+unsigned int MAX_PARTICLES = 2048;
 
 // linked list kernels
 ////////////////////////////////////////////////////////////////////////////////
@@ -97,7 +97,6 @@ __global__ void kernelCreateLinkedList() {
   if (blockIdx.x * blockDim.x + threadIdx.x == 0) {
     // printf("top of if\n");
     deviceCurrNumParticles = 0;
-    MAX_PARTICLES = 2048;
     List *newList = linked_list_init();
 
     // printf("Newlist = %p\n", (void*)newList);
@@ -160,22 +159,15 @@ __device__ float *pickColor(int id){
 }
 
 
-__global__ void kernelSpawnRandParticles(int numToSpawn){
+__global__ void kernelSpawnParticle(float x, float y){
 
   if (blockIdx.x * blockDim.x + threadIdx.x == 0){
-    int width = cuConstRendererParams.imageWidth;
-    int height = cuConstRendererParams.imageHeight;
 
-    for (int i = 0; i < numToSpawn; i++){
-      if (deviceCurrNumParticles == MAX_PARTICLES) break;
-      float *color = pickColor(particleList->size);
-      float x = (float)(width / 4);
-      float y = (float)(height / 4);
-      kernelAddParticle(x, y, color[0], color[1], color[2], color[3]);
-      free(color);
+    float *color = pickColor(particleList->size);
+    kernelAddParticle(x, y, color[0], color[1], color[2], color[3]);
+    free(color);
       
     }
-  }
   
   return;
 
@@ -532,7 +524,7 @@ SimRenderer::getImage() {
 
 void
 SimRenderer::loadScene(Benchmark bm) {
-  loadParticleScene(bm, image->width, image->height, initNumParticles, position, velField, color, isDynamic);
+  loadParticleScene(bm, image->width, image->height, initNumParticles, position, velField, color, isDynamic, numSpawners);
 }
 
 void
@@ -661,10 +653,19 @@ SimRenderer::render() {
   dim3 gridDimParticles(16, 16);
 
 
+
+  // spawn particles based on spawner locations
   if (isDynamic){
-    int numToSpawn = 10;
-    kernelSpawnRandParticles<<<1, 1>>>(numToSpawn);
-    currNumParticles += numToSpawn;
+    for (int j = 0; j < numSpawners; j++){
+        if (currNumParticles > MAX_PARTICLES) break;
+        float newX = position[2 * j];
+        float newY = position[2 * j + 1];
+        kernelSpawnParticle<<<1, 1>>>(newX, newY);
+        currNumParticles ++;
+        
+    }
+    
+    
   }
   
   cudaerr = cudaDeviceSynchronize();

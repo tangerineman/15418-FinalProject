@@ -11,6 +11,7 @@ loadParticleScene(
     float*& position,
     float*& velocity,
     float*& color,
-    bool*& isDynamic);
+    bool& isDynamic,
+    int & numSpawners);
 
 #endif

@@ -31,9 +31,15 @@ int main(int argc, char** argv) {
   } else if (benchmarkStr.compare("circle") == 0) {
     bm = CIRCLE;
     printf("circle\n");
+  } else if (benchmarkStr.compare("blackhole") == 0) {
+    bm = BLACKHOLE;
+    printf("circle\n");
   } else if (benchmarkStr.compare("dyn1") == 0) {
     bm = DYN1;
     printf("dyn1\n");
+  } else if (benchmarkStr.compare("dyn2") == 0) {
+    bm = DYN2;
+    printf("dyn2\n");
   } else {
     bm = STREAM1;
     printf("stream1\n");
