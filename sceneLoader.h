@@ -9,6 +9,7 @@ loadParticleScene(
     int height,
     int& numCircles,
     float*& position,
+    float*& spawners,
     float*& velocity,
     float*& color,
     bool& isDynamic,

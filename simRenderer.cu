@@ -33,7 +33,7 @@ unsigned int MAX_PARTICLES = 2048;
 __device__ List* particleList;
 
 __device__ int deviceCurrNumParticles;
-int currNumParticles;
+int currNumParticles = 0;
 // returns empty linked list with just a head (head contains no information)
 __device__ List *linked_list_init(){
 
@@ -524,7 +524,7 @@ SimRenderer::getImage() {
 
 void
 SimRenderer::loadScene(Benchmark bm) {
-  loadParticleScene(bm, image->width, image->height, initNumParticles, position, velField, color, isDynamic, numSpawners);
+  loadParticleScene(bm, image->width, image->height, initNumParticles, position, velField, color, isDynamic, numSpawners, spawners);
 }
 
 void
@@ -662,7 +662,6 @@ SimRenderer::render() {
         float newY = position[2 * j + 1];
         kernelSpawnParticle<<<1, 1>>>(newX, newY);
         currNumParticles ++;
-        
     }
     
     
@@ -675,10 +674,6 @@ SimRenderer::render() {
 
   float2* cudaDeviceVelFieldUpdated;
   
-  cudaMalloc(&cudaDeviceVelFieldUpdated, sizeof(float) * 2 * image->width * image->height);
-
-
-
   cudaMalloc(&cudaDeviceVelFieldUpdated, sizeof(float) * 2 * image->width * image->height);
 
   printf("IN RENDERER P2\n");

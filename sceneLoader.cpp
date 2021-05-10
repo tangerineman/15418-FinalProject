@@ -19,7 +19,8 @@ void loadParticleScene(
     float*& velField,
     float*& color,
     bool& isDynamic,
-    int& numSpawners)
+    int& numSpawners,
+    float*& spawners)
 {
   printf("in loadParticleScene...\n");
   if (benchmark == STREAM1) {
@@ -283,15 +284,15 @@ void loadParticleScene(
       position[15] = centerY;
 
 
-      float vecScale = 500.f;
+      float vecScale = 0.1;
       for(int j = 0; j < height; j++) {
         for(int k = 0; k < width; k++) {
 
           float offsetX = (float)k - centerX;
           float offsetY = (float)j - centerY;
 
-          velField[(j*width + k) * 2] = vecScale * sin(offsetX + offsetY);
-          velField[(j*width + k) * 2 + 1] = vecScale * cos(offsetX - offsetY);
+          velField[(j*width + k) * 2] = vecScale * (offsetX * offsetX + offsetY * offsetY);
+          velField[(j*width + k) * 2 + 1] = vecScale * offsetX * offsetY;
         }
       }
       

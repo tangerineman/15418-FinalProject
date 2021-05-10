@@ -43,6 +43,7 @@ private:
     int numSpawners;
 
     float* position;
+    float* spawners;
     float* velField;
     float* color;
 
