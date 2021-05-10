@@ -165,8 +165,7 @@ void loadParticleScene(
 
     float centerX = (float)(width / 2);
     float centerY = (float)(height / 2);
-    // float vecScale = -5000.f;
-    float vecScale = -1.f;
+    float vecScale = -5000.f;
     // initialize radial vector field
     for(int j = 0; j < height; j++) {
       for(int k = 0; k < width; k++) {
@@ -175,7 +174,7 @@ void loadParticleScene(
         float offsetY = (float)j - centerY;
 
         velField[(j*width + k) * 2] = offsetY / (offsetX * offsetX + offsetY * offsetY)  * vecScale;
-          velField[(j*width + k) * 2 + 1] = (-1.f * offsetX) / (offsetX * offsetX + offsetY * offsetY)  * vecScale;
+        velField[(j*width + k) * 2 + 1] = (-1.f * offsetX) / (offsetX * offsetX + offsetY * offsetY)  * vecScale;
       }
     }
 
