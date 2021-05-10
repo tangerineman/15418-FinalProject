@@ -138,24 +138,24 @@ void loadParticleScene(
         color[id4+3] = 1.f;
       }
       if(i % 4 == 1) {
-        position[id2] = genRandFloat(width/2, width);//(static_cast <float> (rand()) / static_cast <float> (RAND_MAX)) * 200 + (511 - 200);
-        position[id2+1] = genRandFloat(0, height/2);//(static_cast <float> (rand()) / static_cast <float> (RAND_MAX)) * 200;
+        position[id2] = genRandFloat(width/2, width);
+        position[id2+1] = genRandFloat(0, height/2);
         color[id4] = 0.f;
         color[id4+1] = 1.f;
         color[id4+2] = 0.f;
         color[id4+3] = 1.f;
       }
       if(i % 4 == 2) {
-        position[id2] = genRandFloat(0, width/2); //(static_cast <float> (rand()) / static_cast <float> (RAND_MAX)) * 200;
-        position[id2+1] = genRandFloat(height/2, height);// (static_cast <float> (rand()) / static_cast <float> (RAND_MAX)) * 200 + (511 - 200);
+        position[id2] = genRandFloat(0, width/2);
+        position[id2+1] = genRandFloat(height/2, height);
         color[id4] = 0.f;
         color[id4+1] = 0.f;
         color[id4+2] = 1.f;
         color[id4+3] = 1.f;
       }
       if(i % 4 == 3) {
-        position[id2] = genRandFloat(width/2, width); //(static_cast <float> (rand()) / static_cast <float> (RAND_MAX)) * 200 + (511 - 200);
-        position[id2+1] = genRandFloat(height/2, height); //(static_cast <float> (rand()) / static_cast <float> (RAND_MAX)) * 200 + (511 - 200);
+        position[id2] = genRandFloat(width/2, width);
+        position[id2+1] = genRandFloat(height/2, height);
         color[id4] = 0.f;
         color[id4+1] = .5;
         color[id4+2] = .5;
@@ -202,24 +202,24 @@ void loadParticleScene(
         color[id4+3] = 1.f;
       }
       if(i % 4 == 1) {
-        position[id2] = genRandFloat(width/2, width);//(static_cast <float> (rand()) / static_cast <float> (RAND_MAX)) * 200 + (511 - 200);
-        position[id2+1] = genRandFloat(0, height/2);//(static_cast <float> (rand()) / static_cast <float> (RAND_MAX)) * 200;
+        position[id2] = genRandFloat(width/2, width);
+        position[id2+1] = genRandFloat(0, height/2);
         color[id4] = 0.f;
         color[id4+1] = 1.f;
         color[id4+2] = 0.f;
         color[id4+3] = 1.f;
       }
       if(i % 4 == 2) {
-        position[id2] = genRandFloat(0, width/2); //(static_cast <float> (rand()) / static_cast <float> (RAND_MAX)) * 200;
-        position[id2+1] = genRandFloat(height/2, height);// (static_cast <float> (rand()) / static_cast <float> (RAND_MAX)) * 200 + (511 - 200);
+        position[id2] = genRandFloat(0, width/2);
+        position[id2+1] = genRandFloat(height/2, height);
         color[id4] = 0.f;
         color[id4+1] = 0.f;
         color[id4+2] = 1.f;
         color[id4+3] = 1.f;
       }
       if(i % 4 == 3) {
-        position[id2] = genRandFloat(width/2, width); //(static_cast <float> (rand()) / static_cast <float> (RAND_MAX)) * 200 + (511 - 200);
-        position[id2+1] = genRandFloat(height/2, height); //(static_cast <float> (rand()) / static_cast <float> (RAND_MAX)) * 200 + (511 - 200);
+        position[id2] = genRandFloat(width/2, width);
+        position[id2+1] = genRandFloat(height/2, height);
         color[id4] = 0.f;
         color[id4+1] = .5;
         color[id4+2] = .5;
@@ -253,7 +253,7 @@ void loadParticleScene(
       position = new float[2 * numSpawners];
       isDynamic = true;
 
-      float centerOffset = 50.f;
+      float centerOffset = 100.f;
       float centerX = (float)(width / 2);
       float centerY = (float)(height / 2);
 
