@@ -4,14 +4,16 @@
 
 void
 loadParticleScene(
-    Benchmark benchmark,
-    int width,
-    int height,
-    int& numCircles,
-    float*& position,
-    float*& velocity,
-    float*& color,
-    bool& isDynamic,
-    int & numSpawners);
+  Benchmark benchmark,
+  int maxArraySize,
+  int width,
+  int height,
+  int& numParticles,
+  int& numSpawners,
+  float*& spawners,
+  float*& position,
+  float*& velField,
+  float*& color,
+  bool& isDynamic);
 
 #endif
