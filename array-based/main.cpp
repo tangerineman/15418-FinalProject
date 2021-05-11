@@ -9,6 +9,7 @@ void startRendererWithDisplay(SimRenderer* renderer);
 
 int main(int argc, char** argv) {
   std::string benchmarkStr;
+  int arrayMaxSize;
 
   printf("starting up...\n");
 
@@ -16,10 +17,11 @@ int main(int argc, char** argv) {
   int imageSize = 512;
 
   if (argc > 1) benchmarkStr = argv[1];
+  if (argc > 2) arrayMaxSize = atoi(argv[2]);
 
   SimRenderer* sim_renderer = new SimRenderer();
 
-  
+
   if (argc > 1){
     printf("Running benchmark: ");
     if (benchmarkStr.compare("stream1") == 0) {
@@ -28,6 +30,9 @@ int main(int argc, char** argv) {
   } else if (benchmarkStr.compare("stream2") == 0) {
     bm = STREAM2;
     printf("stream2\n");
+  } else if (benchmarkStr.compare("stream4") == 0) {
+    bm = STREAM4;
+    printf("stream4\n");
   } else if (benchmarkStr.compare("circle") == 0) {
     bm = CIRCLE;
     printf("circle\n");
@@ -55,7 +60,7 @@ int main(int argc, char** argv) {
   printf("allocating scene and stuff...\n");
   sim_renderer->allocOutputImage(imageSize, imageSize);
   printf("loading scene...\n");
-  sim_renderer->loadScene(bm);
+  sim_renderer->loadScene(bm, arrayMaxSize);
   printf("setting up...\n");
   sim_renderer->setup();
 
