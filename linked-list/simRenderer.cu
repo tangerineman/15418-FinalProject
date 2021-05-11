@@ -118,7 +118,7 @@ __global__ void kernelCreateLinkedList() {
                   
         
       kernelAddParticle(pos.x, pos.y, color.x, color.y, color.z, color.w);
-      // printf("size = %d\n", cuConstRendererParams.particleList->size);
+    //   printf("size = %d\n", particleList->size);
     }
 
   }
@@ -526,8 +526,10 @@ SimRenderer::loadScene(Benchmark bm, int maxArraySize) {
 
 void
 SimRenderer::setup() {
+  
   int deviceCount = 0;
   bool isFastGPU = false;
+  
   std::string name;
   cudaError_t err = cudaGetDeviceCount(&deviceCount);
 
@@ -571,7 +573,6 @@ SimRenderer::setup() {
   cudaMalloc(&cudaDeviceImageData, sizeof(float) * 4 * image->width * image->height);
 
   cudaMemcpy(cudaDeviceVelField, velField, sizeof(float) * 2 * image->width * image->height, cudaMemcpyHostToDevice);
-  
   cudaMemcpy(cudaDeviceColor, color, sizeof(float) * 4 * numParticles, cudaMemcpyHostToDevice);
   cudaMemcpy(cudaDevicePosition, position, sizeof(float) * 2 * numParticles, cudaMemcpyHostToDevice);
 
@@ -668,10 +669,6 @@ SimRenderer::render() {
 
   float2* cudaDeviceVelFieldUpdated;
   
-  cudaMalloc(&cudaDeviceVelFieldUpdated, sizeof(float) * 2 * image->width * image->height);
-
-
-
   cudaMalloc(&cudaDeviceVelFieldUpdated, sizeof(float) * 2 * image->width * image->height);
 
   printf("IN RENDERER P2\n");

@@ -18,7 +18,7 @@ int main(int argc, char** argv) {
 
   if (argc > 1) benchmarkStr = argv[1];
   if (argc > 2) arrayMaxSize = atoi(argv[2]);
-
+  else arrayMaxSize = 1024;
   SimRenderer* sim_renderer = new SimRenderer();
 
 
@@ -63,6 +63,7 @@ int main(int argc, char** argv) {
   sim_renderer->loadScene(bm, arrayMaxSize);
   printf("setting up...\n");
   sim_renderer->setup();
+  
 
   printf("starting renderer...\n");
 

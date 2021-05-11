@@ -40,8 +40,8 @@ void loadParticleScene(
     int stream_height = 5;
     int stream_start_y = (height-stream_height)/2;
     int stream_width = 245;
-
-    for(int i = 0; i < numParticles; i++) {
+    
+    for(int i = 0; i < maxArraySize; i++) {
       int id2 = i * 2;
       int id4 = i * 4;
 
@@ -54,7 +54,7 @@ void loadParticleScene(
       color[id4+2] = 0.f;
       color[id4+3] = 1.f;
     }
-
+    
     for(int j = 0; j < height; j++) {
       for(int k = 0; k < width; k++) {
         if(j >= stream_start_y && j <= (stream_start_y + stream_height) && k < stream_width) {
@@ -81,7 +81,7 @@ void loadParticleScene(
     int stream_start_y = (height-stream_height)/2;
     int stream_width = 245;
 
-    for(int i = 0; i < numParticles; i++) {
+    for(int i = 0; i < maxArraySize; i++) {
       int id2 = i * 2;
       int id4 = i * 4;
 
@@ -134,7 +134,7 @@ void loadParticleScene(
     int stream_start_y = (height-stream_height)/2;
     int stream_width = 235;
 
-    for(int i = 0; i < numParticles; i++) {
+    for(int i = 0; i < maxArraySize; i++) {
       int id2 = i * 2;
       int id4 = i * 4;
 
@@ -201,7 +201,7 @@ void loadParticleScene(
 
     isDynamic = false;
 
-    for(int i = 0; i < numParticles; i++) {
+    for(int i = 0; i < maxArraySize; i++) {
       int id2 = i * 2;
       int id4 = i * 4;
 
@@ -271,7 +271,7 @@ void loadParticleScene(
 
     isDynamic = false;
 
-    for(int i = 0; i < numParticles; i++) {
+    for(int i = 0; i < maxArraySize; i++) {
       int id2 = i * 2;
       int id4 = i * 4;
 
