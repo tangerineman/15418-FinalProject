@@ -13,7 +13,7 @@ struct GlobalConstants {
   Benchmark benchmark;
 
   float* velField;
-  int initNumParticles;
+  int numParticles;
 
 
   int imageWidth;
@@ -26,7 +26,6 @@ struct GlobalConstants {
 };
 
 __constant__ GlobalConstants cuConstRendererParams;
-unsigned int MAX_PARTICLES = 2048;
 
 // linked list kernels
 ////////////////////////////////////////////////////////////////////////////////
@@ -108,7 +107,7 @@ __global__ void kernelCreateLinkedList() {
     float* positions = cuConstRendererParams.initial_positions;
     float* colors = cuConstRendererParams.initial_colors;
 
-    for (int i = 0; i < cuConstRendererParams.initNumParticles; i++){
+    for (int i = 0; i < cuConstRendererParams.numParticles; i++){
 
       int posIndex = 2 * i;
       int colIndex = 4 * i;
@@ -119,7 +118,7 @@ __global__ void kernelCreateLinkedList() {
                   
         
       kernelAddParticle(pos.x, pos.y, color.x, color.y, color.z, color.w);
-      // printf("size = %d\n", cuConstRendererParams.particleList->size);
+    //   printf("size = %d\n", particleList->size);
     }
 
   }
@@ -477,8 +476,6 @@ SimRenderer::SimRenderer() {
   image = NULL;
   benchmark = STREAM1;
 
-  initNumParticles = 0;
-
   cudaDevicePosition = NULL;
   cudaDeviceVelField = NULL;
   cudaDeviceColor = NULL;
@@ -523,14 +520,16 @@ SimRenderer::getImage() {
 }
 
 void
-SimRenderer::loadScene(Benchmark bm) {
-  loadParticleScene(bm, image->width, image->height, initNumParticles, position, velField, color, isDynamic, numSpawners);
+SimRenderer::loadScene(Benchmark bm, int maxArraySize) {
+    loadParticleScene(bm, maxArraySize, image->width, image->height, numParticles, numSpawners, spawners, position, velField, color, isDynamic);
 }
 
 void
 SimRenderer::setup() {
+  
   int deviceCount = 0;
   bool isFastGPU = false;
+  
   std::string name;
   cudaError_t err = cudaGetDeviceCount(&deviceCount);
 
@@ -568,15 +567,14 @@ SimRenderer::setup() {
   // See the CUDA Programmer's Guide for descriptions of
   // cudaMalloc and cudaMemcpy
 
-  cudaMalloc(&cudaDevicePosition, sizeof(float) * 2 * initNumParticles);
+  cudaMalloc(&cudaDevicePosition, sizeof(float) * 2 * numParticles);
   cudaMalloc(&cudaDeviceVelField, sizeof(float) * 2 * image->width * image->height);
-  cudaMalloc(&cudaDeviceColor, sizeof(float) * 4 * initNumParticles);
+  cudaMalloc(&cudaDeviceColor, sizeof(float) * 4 * numParticles);
   cudaMalloc(&cudaDeviceImageData, sizeof(float) * 4 * image->width * image->height);
 
   cudaMemcpy(cudaDeviceVelField, velField, sizeof(float) * 2 * image->width * image->height, cudaMemcpyHostToDevice);
-  
-  cudaMemcpy(cudaDeviceColor, color, sizeof(float) * 4 * initNumParticles, cudaMemcpyHostToDevice);
-  cudaMemcpy(cudaDevicePosition, position, sizeof(float) * 2 * initNumParticles, cudaMemcpyHostToDevice);
+  cudaMemcpy(cudaDeviceColor, color, sizeof(float) * 4 * numParticles, cudaMemcpyHostToDevice);
+  cudaMemcpy(cudaDevicePosition, position, sizeof(float) * 2 * numParticles, cudaMemcpyHostToDevice);
 
   cudaMalloc(&particleList, sizeof(List*));
   
@@ -591,7 +589,7 @@ SimRenderer::setup() {
 
   GlobalConstants params;
   params.benchmark = benchmark;
-  params.initNumParticles = initNumParticles;
+  params.numParticles = numParticles;
   params.imageWidth = image->width;
   params.imageHeight = image->height;
   params.initial_positions = cudaDevicePosition;
@@ -625,7 +623,7 @@ void
 SimRenderer::advanceAnimation() {
    // 256 threads per block is a healthy number
   dim3 blockDim(256, 1);
-  int gridDimNum = currNumParticles > initNumParticles? currNumParticles: initNumParticles;
+  int gridDimNum = currNumParticles > numParticles? currNumParticles: numParticles;
   dim3 gridDim((gridDimNum + blockDim.x - 1) / blockDim.x);
 
 
@@ -652,19 +650,15 @@ SimRenderer::render() {
   dim3 blockDimParticles(256);
   dim3 gridDimParticles(16, 16);
 
-
-
   // spawn particles based on spawner locations
   if (isDynamic){
     for (int j = 0; j < numSpawners; j++){
-        if (currNumParticles > MAX_PARTICLES) break;
+        if (currNumParticles > maxNumParticles) break;
         float newX = position[2 * j];
         float newY = position[2 * j + 1];
         kernelSpawnParticle<<<1, 1>>>(newX, newY);
         currNumParticles ++;
-        
     }
-    
     
   }
   
@@ -675,10 +669,6 @@ SimRenderer::render() {
 
   float2* cudaDeviceVelFieldUpdated;
   
-  cudaMalloc(&cudaDeviceVelFieldUpdated, sizeof(float) * 2 * image->width * image->height);
-
-
-
   cudaMalloc(&cudaDeviceVelFieldUpdated, sizeof(float) * 2 * image->width * image->height);
 
   printf("IN RENDERER P2\n");

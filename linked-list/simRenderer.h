@@ -3,6 +3,7 @@ struct Image;
 typedef enum {
     STREAM1,
     STREAM2,
+    STREAM4,
     CIRCLE,
     DYN1,
     DYN2,
@@ -21,7 +22,7 @@ public:
     float r;
     float g;
     float b;
-    float a; 
+    float a;
 };
 
 class List {
@@ -37,22 +38,25 @@ private:
     Image* image;
     Benchmark benchmark;
 
-    int initNumParticles;
+    int numParticles;
+    int maxNumParticles;
 
     bool isDynamic;
     int numSpawners;
 
+    int currParticleIndex;
+    int currParticleLast;
+
     float* position;
     float* velField;
     float* color;
+    float* spawners;
 
     float* cudaDevicePosition;
+    float* cudaDeviceSpawners;
     float* cudaDeviceVelField;
     float* cudaDeviceColor;
     float* cudaDeviceImageData;
-    int* cudaDeviceLocks;
-
-    List* cudaDeviceParticleList;
 
 public:
     SimRenderer();
@@ -62,7 +66,7 @@ public:
 
     void setup();
 
-    void loadScene (Benchmark benchmark);
+    void loadScene (Benchmark benchmark, int maxArraySize);
 
     void allocOutputImage(int width, int height);
 
