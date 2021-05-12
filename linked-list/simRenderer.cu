@@ -172,8 +172,17 @@ __global__ void kernelSpawnParticle(float x, float y){
 
 }
 
-__global__ void freeLinkedList() {
-
+__global__ void kernelFreeLinkedList() {
+    if (blockIdx.x * blockDim.x + threadIdx.x == 0){
+        Node *currNode = particleList->head;
+        while (currNode != NULL){
+            Node* next = currNode->next;
+            delete currNode;
+            currNode = next;
+        }
+        delete particleList;
+    }
+    return;
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -354,12 +363,7 @@ __global__ void kernelVecMomentum(float2* newVelField) {
       counter += 1.f;
       sum = f2add(sum, botRight);
     }
-  
-    //if(curr.x != 0.f && curr.y != 0.f) {
-    //  printf("curr.x, y: %f, %f, new x, y: %f, %f\n", curr.x, curr.y, sum.x, sum.y);
-    //}
-    //printf("sumx, y; %f, %f, counter: %d\n", sum.x, sum.y, counter);
-  
+
     sum.x = counter == 0.f ? 0.f : sum.x / counter;
     sum.y = counter == 0.f ? 0.f : sum.y / counter;
     //printf("curr.x, y: %f, %f, new x, y: %f, %f\n", curr.x, curr.y, sum.x, sum.y);
@@ -403,32 +407,6 @@ __global__ void kernelVecMomentum(float2* newVelField) {
                           topRight.y - topRight.x + botLeft.y - botLeft.x +
                           + 2 * (top.y + bot.y - right.y - left.y)
                           - 4 * curr.y)/8.f;
-    /*
-    newVel.x =  curr.x +
-                (dp(f2add(topLeft, botRight), make_float2(1.f, 1.f)) +
-                 dp(f2add(botLeft, topRight), make_float2(1.f, -1.f)) +
-                 2 * dp(f2sub(f2add(left, right), f2add(top, bot)), make_float2(2.f, -2.f)) +
-                 curr.x * -4.f) / 8.f;
-    newVel.y = curr.y +
-               (dp(f2add(topLeft, botRight), make_float2(1.f, 1.f)) -
-                dp(f2add(botLeft, topRight), make_float2(1.f, -1.f)) -
-                -2 * dp(f2sub(f2add(left, right), f2add(top, bot)), make_float2(2.f, -2.f)) +
-                curr.y * -4.f) / 8.f;*/
-    /*
-    if(row == 258 && curr.x != 0) {
-      printf("\ncurr: %f, %f\ntopLeft: %f, %f\ntop: %f, %f\ntopright: %f, %f\nleft: %f, %f\n, right: %f, %f\nbotleft: %f, %f\nbot: %f, %f\nbotRight: %f, %f\nnew: %f, %f\n",
-      curr.x, curr.y, topLeft.x, topLeft.y,
-      top.x, top.y, topRight.x, topRight.y,
-      left.x, left.y, right.x, right.y,
-      botLeft.x, botLeft.y, bot.x, bot.y,
-      botRight.x, botRight.y, newVel.x, newVel.y);
-    }*/
-  /*
-    if(newVel.x == 200.f)
-      printf("row for entering 200: %d, %d\n", row, col);
-    if(row == 253) {
-      printf("newvel (x, y): %f, %f\nprev was : %f, %f", newVel.x, newVel.y, newVelField[index].x, newVelField[index].y);
-    }*/
     newVelField[index] = newVel;
   }
 
@@ -448,7 +426,6 @@ __global__ void kernelRenderParticles() {
         int py = ceil(p.y);
       
         float4* imgPtr = (float4*)(&cuConstRendererParams.imageData[4 * (py * cuConstRendererParams.imageWidth + px)]);
-  
         *imgPtr = make_float4(currNode->r, currNode->g, currNode->b, currNode->a);
 
       }
@@ -499,7 +476,10 @@ SimRenderer::~SimRenderer() {
     cudaFree(cudaDeviceVelField);
     cudaFree(cudaDeviceColor);
     cudaFree(cudaDeviceImageData);
+    kernelFreeLinkedList<<<1, 1>>>();
+    cudaFree(particleList);
   }
+
 }
 
 const Image*
@@ -576,8 +556,6 @@ SimRenderer::setup() {
   cudaMemcpy(cudaDeviceColor, color, sizeof(float) * 4 * numParticles, cudaMemcpyHostToDevice);
   cudaMemcpy(cudaDevicePosition, position, sizeof(float) * 2 * numParticles, cudaMemcpyHostToDevice);
 
-  cudaMalloc(&particleList, sizeof(List*));
-  
   
   // Initialize parameters in constant memory.  We didn't talk about
   // constant memory in class, but the use of read-only constant
@@ -598,32 +576,20 @@ SimRenderer::setup() {
   params.imageData = cudaDeviceImageData;
 
   cudaMemcpyToSymbol(cuConstRendererParams, &params, sizeof(GlobalConstants));
-
+  currNumParticles = 0;
   kernelCreateLinkedList<<<1, 1>>>();
-
   cudaError_t cudaerr = cudaDeviceSynchronize();
     if (cudaerr != cudaSuccess)
         printf("kernelCreateLinkedList launch failed with error \"%s\".\n",
                cudaGetErrorString(cudaerr));
 
-  /*
-  // Also need to copy over the noise lookup tables, so we can
-  // implement noise on the GPU
-  int* permX;
-  int* permY;
-  float* value1D;
-  getNoiseTables(&permX, &permY, &value1D);
-  cudaMemcpyToSymbol(cuConstNoiseXPermutationTable, permX, sizeof(int) * 256);
-  cudaMemcpyToSymbol(cuConstNoiseYPermutationTable, permY, sizeof(int) * 256);
-  cudaMemcpyToSymbol(cuConstNoise1DValueTable, value1D, sizeof(float) * 256);
-  */
 }
 
 void
 SimRenderer::advanceAnimation() {
    // 256 threads per block is a healthy number
   dim3 blockDim(256, 1);
-  int gridDimNum = currNumParticles > numParticles? currNumParticles: numParticles;
+  int gridDimNum = currNumParticles > numParticles ? currNumParticles: numParticles;
   dim3 gridDim((gridDimNum + blockDim.x - 1) / blockDim.x);
 
 
@@ -653,19 +619,21 @@ SimRenderer::render() {
   // spawn particles based on spawner locations
   if (isDynamic){
     for (int j = 0; j < numSpawners; j++){
-        if (currNumParticles > maxNumParticles) break;
-        float newX = position[2 * j];
-        float newY = position[2 * j + 1];
+        // if (currNumParticles > maxNumParticles) break;
+        float newX = spawners[2 * j];
+        float newY = spawners[2 * j + 1];
         kernelSpawnParticle<<<1, 1>>>(newX, newY);
-        currNumParticles ++;
+        currNumParticles++;
+        // printf("currNumParticles = %d\n", currNumParticles);
+        cudaerr = cudaDeviceSynchronize();
+        if (cudaerr != cudaSuccess)
+            printf("kernelSpawnParticle launch failed with error \"%s\".\n",
+                cudaGetErrorString(cudaerr));
     }
     
   }
   
-  cudaerr = cudaDeviceSynchronize();
-    if (cudaerr != cudaSuccess)
-        printf("kernelSpawnRandParticles launch failed with error \"%s\".\n",
-               cudaGetErrorString(cudaerr));
+  
 
   float2* cudaDeviceVelFieldUpdated;
   
