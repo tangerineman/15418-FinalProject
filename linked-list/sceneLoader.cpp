@@ -28,7 +28,7 @@ void loadParticleScene(
   if (benchmark == STREAM1) {
     numParticles = 1024;
     numSpawners = 0;
-    
+
     spawners = new float[2*numSpawners];
     position = new float[2*numParticles];
     velField = new float[2*width*height];
@@ -39,7 +39,7 @@ void loadParticleScene(
     int stream_height = 5;
     int stream_start_y = (height-stream_height)/2;
     int stream_width = 245;
-    
+
     for(int i = 0; i < numParticles; i++) {
       int id2 = i * 2;
       int id4 = i * 4;
@@ -53,7 +53,7 @@ void loadParticleScene(
       color[id4+2] = 0.f;
       color[id4+3] = 1.f;
     }
-    
+
     for(int j = 0; j < height; j++) {
       for(int k = 0; k < width; k++) {
         if(j >= stream_start_y && j <= (stream_start_y + stream_height) && k < stream_width) {
@@ -67,7 +67,7 @@ void loadParticleScene(
     }
 
   } else if (benchmark == STREAM2) {
-    numParticles = 2048;
+    numParticles = 65636;
     numSpawners = 0;
 
     position = new float[2*numParticles];

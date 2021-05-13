@@ -1,0 +1,25 @@
+This repo is for Alex Glass (aglass) and Carlos Armendariz (carmenda) 15-418 Final Project
+
+There are two implementations we created each with the same 7 benchmarks.
+
+To run either implementation, do the following:
+
+1. Within sceneLoader.cpp of the implementation you desire to run, there is a
+  list of benchmarks and their code. Ensure that numParticles is set to your
+  desired value for the benchmark you choose. Change nothing else
+
+2. cd into the folder of the implementation you want and run 'make'
+  (dont run 'make veryclean' it may delete all the code)
+
+3. now run './render BENCHMARK_NAME MAX_PARTICLES'
+  MAX_PARTICLES should be equal to or greater than the number used in step 1.
+  Possible benchmark names are: 'stream1', 'stream2', 'stream4', 'circle',
+                                'blackhole', 'dyn1', and 'dyn2'
+  dyn1 and dyn2 are dynamic benchmarks that spawn particles
+
+4. to exit, simply exit out of the display window.
+
+
+Direct any questions troubles to aglass@andrew.cmu.edu
+
+Thanks.

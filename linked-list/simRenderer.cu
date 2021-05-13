@@ -9,6 +9,8 @@
 
 #include "image.h"
 
+#define ITERS 20
+
 struct GlobalConstants {
   Benchmark benchmark;
 
@@ -39,7 +41,7 @@ int currNumParticles;
 __device__ List *linked_list_init(){
 
   List *newList = new(List);
-  
+
   Node *newNode = new (Node);
   newNode->next = NULL;
   newNode->prev = NULL;
@@ -53,7 +55,7 @@ __device__ List *linked_list_init(){
   newList->head = newNode;
   newList->tail = newNode;
   newList->size = 1;
-  
+
   return newList;
 }
 
@@ -66,11 +68,11 @@ __device__ void insert_node(List* list, float x, float y, float r, float g, floa
   newNode->next = NULL;
   newNode->x = x;
   newNode->y = y;
-  
+
   newNode->r = r;
   newNode->g = g;
   newNode->b = b;
-  newNode->a = a; 
+  newNode->a = a;
 
   list->tail->next = newNode;
   list->tail = newNode;
@@ -82,7 +84,7 @@ __device__ void insert_node(List* list, float x, float y, float r, float g, floa
 
 // adds new particle with specified info to the linked list
 __device__ void kernelAddParticle(float x, float y, float r, float g, float b, float a){
-  
+
   if (blockIdx.x * blockDim.x + threadIdx.x == 0){
     insert_node(particleList, x, y, r, g, b, a);
     deviceCurrNumParticles++;
@@ -92,7 +94,7 @@ __device__ void kernelAddParticle(float x, float y, float r, float g, float b, f
 
 // creates a linked list using the initial position and color arrays in global constants
 __global__ void kernelCreateLinkedList() {
- 
+
   if (blockIdx.x * blockDim.x + threadIdx.x == 0) {
     deviceCurrNumParticles = 0;
     List *newList = linked_list_init();
@@ -110,7 +112,7 @@ __global__ void kernelCreateLinkedList() {
       float2 pos = make_float2(positions[posIndex], positions[posIndex + 1]);
       float4 color = make_float4(colors[colIndex], colors[colIndex+1],
                                   colors[colIndex+2], colors[colIndex+3]);
-          
+
       kernelAddParticle(pos.x, pos.y, color.x, color.y, color.z, color.w);
 
     }
@@ -159,9 +161,9 @@ __global__ void kernelSpawnParticle(float x, float y){
     float *color = pickColor(particleList->size);
     kernelAddParticle(x, y, color[0], color[1], color[2], color[3]);
     free(color);
-      
+
     }
-  
+
   return;
 
 }
@@ -220,14 +222,14 @@ __global__ void kernelBasic() {
         int currX = currNode->x;
         int currY = currNode->y;
         currNode->x += velField[2*(w * currY + currX)] * dt;
-  
+
         if(ceil(currNode->x) <= 0)
           currNode->x = 0;
         else if (ceil(currNode->x) >= w-1)
           currNode->x = w-1;
-  
+
         currNode->y += velField[2*(w * currY + currX) + 1] * dt;
-  
+
         if(ceil(currNode->y) <= 0)
           currNode->y = 0;
         else if (ceil(currNode->y) >= h-1)
@@ -237,7 +239,7 @@ __global__ void kernelBasic() {
     currNode = currNode->next;
     index ++;
   }
-  
+
 }
 
 __device__ float dp(float2 a, float2 b) {
@@ -267,146 +269,152 @@ __global__ void kernelVelFieldCopy(float2* newVelField) {
 
 
 __global__ void kernelVecMomentum(float2* newVelField) {
-    uint col = (blockIdx.x * blockDim.x) + threadIdx.x;
-    uint row = (blockIdx.y * blockDim.y) + threadIdx.y;
-  
-    int w = cuConstRendererParams.imageWidth;
-    int h = cuConstRendererParams.imageHeight;
-  
-    int index = row * w + col;
-  
-    float2* velField2 = (float2*) cuConstRendererParams.velField;
-  
-    float2 curr = velField2[index];
-    float2 sum = make_float2(curr.x, curr.y);
-  
-    float2 zero = make_float2(0.f, 0.f);
-  
-    float2 topLeft = (row == 0 || col == 0) ? zero : velField2[index - w - 1];
-    if(topLeft.y == 0.f)
-      topLeft.y = 0.0000001f;
-    float2 top = (row == 0) ? zero : velField2[index - w];
-    if(top.y == 0.f)
-      top.y = 0.0000001f;
-    float2 topRight = (row == 0 || col == (w-1)) ? zero : velField2[index - w + 1];
-    if(topRight.y == 0.f)
-      topRight.y = 0.0000001f;
-    float2 left = (col == 0) ? zero : velField2[index - 1];
-    if(left.y == 0.f)
-      left.y = 0.0000001f;
-    float2 right = (col == (w-1)) ? zero : velField2[index + 1];
-    if(right.y == 0.f)
-      right.y = 0.0000001f;
-    float2 botLeft = (row == (h-1) || col == 0) ? zero : velField2[index + w - 1];
-    if(botLeft.y == 0.f)
-      botLeft.y = 0.0000001f;
-    float2 bot = (row == (h-1)) ? zero : velField2[index + w];
-    if(bot.y == 0.f)
-      bot.y = 0.0000001f;
-    float2 botRight = (row == (h-1) || col == (w-1)) ? zero : velField2[index + w + 1];
-    if(botRight.y == 0.f)
-      botRight.y = 0.0000001f;
-  
-    float counter = 1.f;
-    float atres;
-  
-    atres = atan(topLeft.y / topLeft.x);
-    if(topLeft.x > 0.f && topLeft.y > 0.f && atres > 0.523f && atres < 1.05f) {
-      counter += 1.f;
-      sum = f2add(sum, topLeft);
-    }
-  
-    atres = atan(top.y / top.x);
-    if(top.y > 0.f && atres > 1.05f && atres < 2.09f) {
-      counter += 1.f;
-      sum = f2add(sum, top);
-    }
-  
-    atres = abs(atan(topRight.y / topRight.x));
-    if(topRight.x < 0.f && topRight.y > 0.f && atres > 0.523f && atres < 1.05f) {
-      counter += 1.f;
-      sum = f2add(sum, topRight);
-    }
-  
-    atres = atan(left.y / left.x);
-    if(left.x > 0.f && atres < 1.05f && atres > -1.05f) {
-      counter += 1.f;
-      sum = f2add(sum, left);
-    }
-  
-    atres = atan(right.y / right.x);
-    if(right.x < 0.f && atres < 1.05f && atres > -1.05f) {
-      counter += 1.f;
-      sum = f2add(sum, right);
-    }
-  
-    atres = abs(atan(botLeft.y / botLeft.x));
-    if(botLeft.y < 0.f && botLeft.x > 0.f && atres > 0.523f && atres < 1.05f) {
-      counter += 1.f;
-      sum = f2add(sum, botLeft);
-    }
-  
-    atres = abs(atan(bot.y / bot.x));
-    if(bot.y < 0.f && atres > 1.05f && atres < 2.09f) {
-      counter += 1.f;
-      sum = f2add(sum, bot);
-    }
-  
-    atres = atan(botRight.y / botRight.x);
-    if(botRight.x < 0.f && botRight.y < 0.f && atres > 0.523f && atres < 1.05f) {
-      counter += 1.f;
-      sum = f2add(sum, botRight);
-    }
+  uint col = (blockIdx.x * blockDim.x) + threadIdx.x;
+  uint row = (blockIdx.y * blockDim.y) + threadIdx.y;
 
-    sum.x = counter == 0.f ? 0.f : sum.x / counter;
-    sum.y = counter == 0.f ? 0.f : sum.y / counter;
-    //printf("curr.x, y: %f, %f, new x, y: %f, %f\n", curr.x, curr.y, sum.x, sum.y);
-  
-  
-    newVelField[index] = sum;
+  int w = cuConstRendererParams.imageWidth;
+  int h = cuConstRendererParams.imageHeight;
+
+  int index = row * w + col;
+
+  float2* velField2 = (float2*) cuConstRendererParams.velField;
+
+  float2 curr = velField2[index];
+  float2 sum = make_float2(curr.x, curr.y);
+
+  float2 zero = make_float2(0.f, 0.f);
+
+  // calculate surrounding pixels and ensure they are not 0 for division issues
+  float2 topLeft = (row == 0 || col == 0) ? zero : velField2[index - w - 1];
+  if(topLeft.y == 0.f)
+    topLeft.y = 0.0000001f;
+  float2 top = (row == 0) ? zero : velField2[index - w];
+  if(top.y == 0.f)
+    top.y = 0.0000001f;
+  float2 topRight = (row == 0 || col == (w-1)) ? zero : velField2[index - w + 1];
+  if(topRight.y == 0.f)
+    topRight.y = 0.0000001f;
+  float2 left = (col == 0) ? zero : velField2[index - 1];
+  if(left.y == 0.f)
+    left.y = 0.0000001f;
+  float2 right = (col == (w-1)) ? zero : velField2[index + 1];
+  if(right.y == 0.f)
+    right.y = 0.0000001f;
+  float2 botLeft = (row == (h-1) || col == 0) ? zero : velField2[index + w - 1];
+  if(botLeft.y == 0.f)
+    botLeft.y = 0.0000001f;
+  float2 bot = (row == (h-1)) ? zero : velField2[index + w];
+  if(bot.y == 0.f)
+    bot.y = 0.0000001f;
+  float2 botRight = (row == (h-1) || col == (w-1)) ? zero : velField2[index + w + 1];
+  if(botRight.y == 0.f)
+    botRight.y = 0.0000001f;
+
+  float counter = 1.f;
+  float atres;
+
+  // the following is logic using angles to determine if the surrounding pixels vectors
+  // intersect with the center pixel being computed
+  atres = abs(atan(topLeft.y / topLeft.x));
+  if(topLeft.x > 0.f && topLeft.y > 0.f && atres > 0.523f && atres < 1.05f) {
+    counter += 1.f;
+    sum = f2add(sum, topLeft);
+  }
+
+  atres = abs(atan(top.y / top.x));
+  if(top.y > 0.f && atres >= 1.05f && atres <= 2.09f) {
+    counter += 1.f;
+    sum = f2add(sum, top);
+  }
+
+  atres = abs(atan(topRight.y / topRight.x));
+  if(topRight.x < 0.f && topRight.y > 0.f && atres > 0.523f && atres < 1.05f) {
+    counter += 1.f;
+    sum = f2add(sum, topRight);
+  }
+
+  atres = abs(atan(left.y / left.x));
+  if(left.x > 0.f && atres < 1.05f) {
+    counter += 1.f;
+    sum = f2add(sum, left);
+  }
+
+  atres = abs(atan(right.y / right.x));
+  if(right.x < 0.f && atres < 1.05f) {
+    counter += 1.f;
+    sum = f2add(sum, right);
+  }
+
+  atres = abs(atan(botLeft.y / botLeft.x));
+  if(botLeft.y < 0.f && botLeft.x > 0.f && atres > 0.523f && atres < 1.05f) {
+    counter += 1.f;
+    sum = f2add(sum, botLeft);
+  }
+
+  atres = abs(atan(bot.y / bot.x));
+  if(bot.y < 0.f && atres >= 1.05f && atres <= 2.09f) {
+    counter += 1.f;
+    sum = f2add(sum, bot);
+  }
+
+  atres = atan(botRight.y / botRight.x);
+  if(botRight.x < 0.f && botRight.y < 0.f && atres > 0.523f && atres < 1.05f) {
+    counter += 1.f;
+    sum = f2add(sum, botRight);
+  }
+
+  sum.x = counter == 0.f ? 0.f : sum.x / counter;
+  sum.y = counter == 0.f ? 0.f : sum.y / counter;
+
+  newVelField[index] = sum;
   }
 
   __global__ void kernelUpdateVectorField(float2* newVelField) {
     uint col = (blockIdx.x * blockDim.x) + threadIdx.x;
     uint row = (blockIdx.y * blockDim.y) + threadIdx.y;
-  
+
     int h = cuConstRendererParams.imageHeight;
     int w = cuConstRendererParams.imageWidth;
-  
+
+    if(col >= w || row >= h) {
+      return;
+    }
+
     int index = row * w + col;
-  
+
     float2* velField2 = (float2*) cuConstRendererParams.velField;
-  
+
     float2 curr = velField2[index];
-  
+
     float2 zero = make_float2(0.f, 0.f);
-  
-    float2 topLeft = (row == 0 || col == 0) ? zero : velField2[index - w - 1];
-    float2 top = (row == 0) ? zero : velField2[index - w];
-    float2 topRight = (row == 0 || col == (w-1)) ? zero : velField2[index - w + 1];
+
+    // surrounding pixel logic
+    float2 botLeft = (row == 0 || col == 0) ? zero : velField2[index - w - 1];
+    float2 bot = (row == 0) ? zero : velField2[index - w];
+    float2 botRight = (row == 0 || col == (w-1)) ? zero : velField2[index - w + 1];
     float2 left = (col == 0) ? zero : velField2[index - 1];
     float2 right = (col == (w-1)) ? zero : velField2[index + 1];
-    float2 botLeft = (row == (h-1) || col == 0) ? zero : velField2[index + w - 1];
-    float2 bot = (row == (h-1)) ? zero : velField2[index + w];
-    float2 botRight = (row == (h-1) || col == (w-1)) ? zero : velField2[index + w + 1];
-  
+    float2 topLeft = (row == (h-1) || col == 0) ? zero : velField2[index + w - 1];
+    float2 top = (row == (h-1)) ? zero : velField2[index + w];
+    float2 topRight = (row == (h-1) || col == (w-1)) ? zero : velField2[index + w + 1];
+
     float2 newVel;
-  
+
+    // calculate gradient in x direction and add it to current x val
     newVel.x = curr.x + (topRight.x + topRight.y + botLeft.x + botLeft.y +
                          topLeft.x - topLeft.y + botRight.x - botRight.y +
                          + 2 * (left.x + right.x - top.x - bot.x)
                          - 4 * curr.x)/8.f;
-  
-     newVel.y = curr.y + (topLeft.x + topLeft.y + botRight.x + botRight.y +
-                          topRight.y - topRight.x + botLeft.y - botLeft.x +
+     // calculate gradient in y direction and add it to current y val
+     newVel.y = curr.y + (topRight.x + topRight.y + botLeft.x + botLeft.y +
+                          topLeft.y - topLeft.x + botRight.y - botRight.x +
                           + 2 * (top.y + bot.y - right.y - left.y)
                           - 4 * curr.y)/8.f;
+
     newVelField[index] = newVel;
   }
 
 __global__ void kernelRenderParticles() {
-  // printf("KERNEL RENDER PARTICLES\n");
-
   Node *currNode = particleList->head->next;
   unsigned int thrId = blockIdx.x * blockDim.x + threadIdx.x;
   int index = 0;
@@ -418,7 +426,7 @@ __global__ void kernelRenderParticles() {
         float2 p = make_float2(currNode->x, currNode->y);
         int px = ceil(p.x);
         int py = ceil(p.y);
-      
+
         float4* imgPtr = (float4*)(&cuConstRendererParams.imageData[4 * (py * cuConstRendererParams.imageWidth + px)]);
         *imgPtr = make_float4(currNode->r, currNode->g, currNode->b, currNode->a);
 
@@ -500,10 +508,10 @@ SimRenderer::loadScene(Benchmark bm, int maxArraySize) {
 
 void
 SimRenderer::setup() {
-  
+
   int deviceCount = 0;
   bool isFastGPU = false;
-  
+
   std::string name;
   cudaError_t err = cudaGetDeviceCount(&deviceCount);
 
@@ -550,7 +558,7 @@ SimRenderer::setup() {
   cudaMemcpy(cudaDeviceColor, color, sizeof(float) * 4 * numParticles, cudaMemcpyHostToDevice);
   cudaMemcpy(cudaDevicePosition, position, sizeof(float) * 2 * numParticles, cudaMemcpyHostToDevice);
 
-  
+
   // Initialize parameters in constant memory.  We didn't talk about
   // constant memory in class, but the use of read-only constant
   // memory here is an optimization over just sticking these values
@@ -622,13 +630,13 @@ SimRenderer::render() {
           printf("kernelSpawnParticle launch failed with error \"%s\".\n",
               cudaGetErrorString(cudaerr));
   }
-    
-  
-  
-  
+
+
+
+
 
   float2* cudaDeviceVelFieldUpdated;
-  
+
   cudaMalloc(&cudaDeviceVelFieldUpdated, sizeof(float) * 2 * image->width * image->height);
 
   kernelVecMomentum<<<gridDimVec, blockDimVec>>>(cudaDeviceVelFieldUpdated);
@@ -636,7 +644,7 @@ SimRenderer::render() {
   kernelVelFieldCopy<<<gridDimVec, blockDimVec>>>(cudaDeviceVelFieldUpdated);
   cudaDeviceSynchronize();
 
-  for(int i = 0; i < 1; i++) {
+  for(int i = 0; i < ITERS; i++) {
     kernelUpdateVectorField<<<gridDimVec, blockDimVec>>>(cudaDeviceVelFieldUpdated);
     cudaDeviceSynchronize();
     kernelVelFieldCopy<<<gridDimVec, blockDimVec>>>(cudaDeviceVelFieldUpdated);

@@ -26,7 +26,7 @@ void loadParticleScene(
 {
   printf("in loadParticleScene...\n");
   if (benchmark == STREAM1) {
-    numParticles = 2048;
+    numParticles = 1024;
     numSpawners = 0;
 
     //TODO copy this
@@ -68,7 +68,7 @@ void loadParticleScene(
     }
 
   } else if (benchmark == STREAM2) {
-    numParticles = 2048;
+    numParticles = 1024;
     numSpawners = 0;
 
     position = new float[2*maxArraySize];
@@ -121,7 +121,7 @@ void loadParticleScene(
       }
     }
   } else if (benchmark == STREAM4) {
-    numParticles = 2048;
+    numParticles = 4096;
     numSpawners = 0;
 
     position = new float[2*maxArraySize];
@@ -262,7 +262,7 @@ void loadParticleScene(
 
 
   } else if (benchmark == BLACKHOLE){
-    numParticles = 1024;
+    numParticles = 8192;
     numSpawners = 0;
 
     position = new float[2*maxArraySize];
@@ -325,58 +325,57 @@ void loadParticleScene(
       }
     }
   } else if (benchmark == DYN1){
+    isDynamic = true;
+    numParticles = 0;
 
-      numParticles = 0;
+    color = new float[4*numParticles];
+    velField = new float[2*width*height];
 
-      color = new float[4*maxArraySize];
-      velField = new float[2*width*height];
+    numSpawners = 8;
+    position = new float[2 * maxArraySize];
+    spawners = new float[2 * numSpawners];
 
-      numSpawners = 8;
-      position = new float[2 * maxArraySize];
-      spawners = new float[2 * numSpawners];
-      isDynamic = true;
+    float centerOffset = 100.f;
+    float centerX = (float)(width / 2);
+    float centerY = (float)(height / 2);
 
-      float centerOffset = 100.f;
-      float centerX = (float)(width / 2);
-      float centerY = (float)(height / 2);
+    // place spawners
+    spawners[0] = centerX + centerOffset;
+    spawners[1] = centerY + centerOffset;
 
-      // place spawners
-      spawners[0] = centerX + centerOffset;
-      spawners[1] = centerY + centerOffset;
+    spawners[2] = centerX - centerOffset;
+    spawners[3] = centerY - centerOffset;
 
-      spawners[2] = centerX - centerOffset;
-      spawners[3] = centerY - centerOffset;
+    spawners[4] = centerX - centerOffset;
+    spawners[5] = centerY + centerOffset;
 
-      spawners[4] = centerX - centerOffset;
-      spawners[5] = centerY + centerOffset;
+    spawners[6] = centerX + centerOffset;
+    spawners[7] = centerY - centerOffset;
 
-      spawners[6] = centerX + centerOffset;
-      spawners[7] = centerY - centerOffset;
+    spawners[8] = centerX;
+    spawners[9] = centerY + centerOffset;
 
-      spawners[8] = centerX;
-      spawners[9] = centerY + centerOffset;
+    spawners[10] = centerX;
+    spawners[11] = centerY - centerOffset;
 
-      spawners[10] = centerX;
-      spawners[11] = centerY - centerOffset;
+    spawners[12] = centerX - centerOffset;
+    spawners[13] = centerY;
 
-      spawners[12] = centerX - centerOffset;
-      spawners[13] = centerY;
-
-      spawners[14] = centerX + centerOffset;
-      spawners[15] = centerY;
+    spawners[14] = centerX + centerOffset;
+    spawners[15] = centerY;
 
 
-      float vecScale = 600.f;
-      for(int j = 0; j < height; j++) {
-        for(int k = 0; k < width; k++) {
+    float vecScale = -1.f;
+    for(int j = 0; j < height; j++) {
+      for(int k = 0; k < width; k++) {
 
-          float offsetX = (float)k - centerX;
-          float offsetY = (float)j - centerY;
+        float offsetX = (float)k - centerX;
+        float offsetY = (float)j - centerY;
 
-          velField[(j*width + k) * 2] = vecScale * sin(offsetX + offsetY);
-          velField[(j*width + k) * 2 + 1] = vecScale * cos(offsetX - offsetY);
-        }
+        velField[(j*width + k) * 2] = vecScale * offsetX;
+        velField[(j*width + k) * 2 + 1] = vecScale * offsetY;
       }
+    }
 
   }
 

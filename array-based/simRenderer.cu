@@ -9,6 +9,8 @@
 
 #include "image.h"
 
+#define ITERS 50
+
 struct GlobalConstants {
   Benchmark benchmark;
 
@@ -36,17 +38,7 @@ __constant__ GlobalConstants cuConstRendererParams;
 // linked list kernels
 ////////////////////////////////////////////////////////////////////////////////
 
-// returns empty linked list with just a head (head contains no information)
-
-/*
-__device__ void kernelAddParticle(float x, float y, float r, float g, float b, float a){
-
-  if (blockIdx.x * blockDim.x + threadIdx.x == 0){
-    insert_node(particleList, x, y, r, g, b, a);
-    deviceCurrNumParticles++;
-  }
-}*/
-
+// helper function to quickly pick a color given an id
 __device__ float *pickColor(int id){
   float *color = (float*)malloc(sizeof(float) * 4);
   if(id % 4 == 0) {
@@ -77,24 +69,9 @@ __device__ float *pickColor(int id){
   return color;
 }
 
-/*
-__global__ void kernelSpawnParticle(float x, float y){
-
-  if (blockIdx.x * blockDim.x + threadIdx.x == 0){
-
-    float *color = pickColor(particleList->size);
-    kernelAddParticle(x, y, color[0], color[1], color[2], color[3]);
-    free(color);
-
-    }
-
-  return;
-
-}*/
-
 ////////////////////////////////////////////////////////////////////////////////
 
-
+// kernel to clear an image with black pixels
 __global__ void kernelClearImage(float r, float g, float b, float a) {
   int imageX = blockIdx.x * blockDim.x + threadIdx.x;
   int imageY = blockIdx.y * blockDim.y + threadIdx.y;
@@ -108,12 +85,11 @@ __global__ void kernelClearImage(float r, float g, float b, float a) {
   int offset = 4 * (imageY * width + imageX);
   float4 value = make_float4(r, g, b, a);
 
-  // Write to global memory: As an optimization, this code uses a float4
-  // store, which results in more efficient code than if it were coded as
-  // four separate float stores.
   *(float4*)(&cuConstRendererParams.imageData[offset]) = value;
 }
 
+//kernel to update a particles positions acording to the corresponding velocity
+// at the particles position
 __global__ void kernelBasic(int currParticleIndex, int currParticleLast) {
   const float dt = 1.f / 60.f;
 
@@ -138,38 +114,31 @@ __global__ void kernelBasic(int currParticleIndex, int currParticleLast) {
   int currX = ceil(position[pIdx]);
   int currY = ceil(position[pIdx + 1]);
 
-  //printf("old pos: %f, %f\n", position[pIdx], position[pIdx+1]);
+  //update x position
   position[pIdx] += velField[2*(w * currY + currX)] * dt;
-  //printf("vfv: %f\n", velField[2*(w * currY + currX)]);
 
+  //boundaries to ensure particles do not go off screen
   if(ceil(position[pIdx]) <= 0)
     position[pIdx] = 0;
   else if (ceil(position[pIdx]) >= w-1)
     position[pIdx] = w-1;
 
+  //update y position
   position[pIdx+1] += velField[2*(w * currY + currX) + 1] * dt;
+  //boundaries to ensure particles do not go off screen
   if(ceil(position[pIdx+1]) <= 0)
     position[pIdx+1] = 0;
   else if (ceil(position[pIdx+1]) >= h-1)
     position[pIdx+1] = h-1;
 
-  //vel stays the same
-  //printf("new pos: %f, %f\n", position[pIdx], position[pIdx+1]);
-
 }
 
-__device__ float dp(float2 a, float2 b) {
-  return a.x * b.x + a.y * b.y;
-}
-
+//helper function to add two float2's
 __device__ float2 f2add(float2 a, float2 b) {
   return make_float2(a.x + b.x, a.y + b.y);
 }
 
-__device__ float2 f2sub(float2 a, float2 b) {
-  return make_float2(a.x - b.x, a.y - b.y);
-}
-
+//kernel to copy vel field data from input to cuda mem
 __global__ void kernelVelFieldCopy(float2* newVelField) {
   uint col = (blockIdx.x * blockDim.x) + threadIdx.x;
   uint row = (blockIdx.y * blockDim.y) + threadIdx.y;
@@ -183,7 +152,7 @@ __global__ void kernelVelFieldCopy(float2* newVelField) {
   cuConstRendererParams.velField[2*index+1] = newVelField[index].y;
 }
 
-
+//kernel to update the velocity based on momentum of the field
 __global__ void kernelVecMomentum(float2* newVelField) {
     uint col = (blockIdx.x * blockDim.x) + threadIdx.x;
     uint row = (blockIdx.y * blockDim.y) + threadIdx.y;
@@ -200,6 +169,7 @@ __global__ void kernelVecMomentum(float2* newVelField) {
 
     float2 zero = make_float2(0.f, 0.f);
 
+    // calculate surrounding pixels and ensure they are not 0 for division issues
     float2 topLeft = (row == 0 || col == 0) ? zero : velField2[index - w - 1];
     if(topLeft.y == 0.f)
       topLeft.y = 0.0000001f;
@@ -228,6 +198,8 @@ __global__ void kernelVecMomentum(float2* newVelField) {
     float counter = 1.f;
     float atres;
 
+    // the following is logic using angles to determine if the surrounding pixels vectors
+    // intersect with the center pixel being computed
     atres = abs(atan(topLeft.y / topLeft.x));
     if(topLeft.x > 0.f && topLeft.y > 0.f && atres > 0.523f && atres < 1.05f) {
       counter += 1.f;
@@ -282,6 +254,7 @@ __global__ void kernelVecMomentum(float2* newVelField) {
     newVelField[index] = sum;
   }
 
+// kernel to remove the divergence from the vector field
 __global__ void kernelUpdateVectorField(float2* newVelField) {
     uint col = (blockIdx.x * blockDim.x) + threadIdx.x;
     uint row = (blockIdx.y * blockDim.y) + threadIdx.y;
@@ -289,7 +262,7 @@ __global__ void kernelUpdateVectorField(float2* newVelField) {
     int h = cuConstRendererParams.imageHeight;
     int w = cuConstRendererParams.imageWidth;
 
-    if(col < 0 || col >= w || row < 0 || row >= h) {
+    if(col >= w || row >= h) {
       return;
     }
 
@@ -301,6 +274,7 @@ __global__ void kernelUpdateVectorField(float2* newVelField) {
 
     float2 zero = make_float2(0.f, 0.f);
 
+    // surrounding pixel logic
     float2 botLeft = (row == 0 || col == 0) ? zero : velField2[index - w - 1];
     float2 bot = (row == 0) ? zero : velField2[index - w];
     float2 botRight = (row == 0 || col == (w-1)) ? zero : velField2[index - w + 1];
@@ -312,32 +286,22 @@ __global__ void kernelUpdateVectorField(float2* newVelField) {
 
     float2 newVel;
 
+    // calculate gradient in x direction and add it to current x val
     newVel.x = curr.x + (topRight.x + topRight.y + botLeft.x + botLeft.y +
                          topLeft.x - topLeft.y + botRight.x - botRight.y +
                          + 2 * (left.x + right.x - top.x - bot.x)
                          - 4 * curr.x)/8.f;
-
+     // calculate gradient in y direction and add it to current y val
      newVel.y = curr.y + (topRight.x + topRight.y + botLeft.x + botLeft.y +
                           topLeft.y - topLeft.x + botRight.y - botRight.x +
                           + 2 * (top.y + bot.y - right.y - left.y)
                           - 4 * curr.y)/8.f;
-    /*
-    newVel.x =  curr.x +
-                (dp(f2add(topLeft, botRight), make_float2(1.f, 1.f)) +
-                 dp(f2add(botLeft, topRight), make_float2(1.f, -1.f)) +
-                 2 * dp(f2sub(f2add(left, right), f2add(top, bot)), make_float2(2.f, -2.f)) +
-                 curr.x * -4.f) / 8.f;
-    newVel.y = curr.y +
-               (dp(f2add(topLeft, botRight), make_float2(1.f, 1.f)) -
-                dp(f2add(botLeft, topRight), make_float2(1.f, -1.f)) -
-                -2 * dp(f2sub(f2add(left, right), f2add(top, bot)), make_float2(2.f, -2.f)) +
-                curr.y * -4.f) / 8.f;*/
 
     newVelField[index] = newVel;
 }
 
+// kernel to spawn particles from spawning locations
 __global__ void kernelSpawnParticles(int currParticleIndex, int currParticleLast) {
-  //printf("woohoo\n");
   int index = blockIdx.x * blockDim.x + threadIdx.x;
   int cpi = currParticleIndex;
   int cpl = currParticleLast;
@@ -346,17 +310,13 @@ __global__ void kernelSpawnParticles(int currParticleIndex, int currParticleLast
   int maxNumParticles = cuConstRendererParams.maxNumParticles;
   int numSpawners = cuConstRendererParams.numSpawners;
 
-  //if (index >= cuConstRendererParams.numParticles || index < 0)
-  //    return;
 
   int posIndex = (index + cpl) % maxNumParticles;
 
   if(cpl < cpi && !(posIndex < cpi && posIndex >= cpl)) {
-    //printf("exit1\n");
     return;
   }
   if (cpl > cpi && posIndex < cpl && posIndex >= cpi) {
-    //printf("exit2\n");
     return;
   }
 
@@ -369,20 +329,14 @@ __global__ void kernelSpawnParticles(int currParticleIndex, int currParticleLast
   float* newCol = pickColor(2);
   *c = make_float4(newCol[0], newCol[1], newCol[2], newCol[3]);
 
-  printf("made pos idx: %d a color\n", posIndex);
-
-
 }
 
+// kernel to move the particles from their positions and update the image with the appropriate color
 __global__ void kernelRenderParticles(int currParticleIndex, int currParticleLast) {
-  // printf("KERNEL RENDER PARTICLES\n");
   int index = blockIdx.x * blockDim.x + threadIdx.x;
 
   //int currParticleIndex = cuConstRendererParams.currParticleIndex;
   int maxNumParticles = cuConstRendererParams.maxNumParticles;
-
-  //if (index >= cuConstRendererParams.numParticles || index < 0)
-  //    return;
 
   index = (index + currParticleIndex) % maxNumParticles;
 
@@ -415,6 +369,7 @@ void SimRenderer::clearImage() {
     cudaDeviceSynchronize();
 }
 
+//render initialization function
 SimRenderer::SimRenderer() {
   image = NULL;
   benchmark = STREAM1;
@@ -428,7 +383,7 @@ SimRenderer::SimRenderer() {
   cudaDeviceImageData = NULL;
 }
 
-
+// render uninitialization func
 SimRenderer::~SimRenderer() {
   if (image) {
     delete image;
@@ -525,9 +480,6 @@ SimRenderer::setup() {
   cudaMemcpy(cudaDeviceVelField, velField, sizeof(float) * 2 * image->width * image->height, cudaMemcpyHostToDevice);
   cudaMemcpy(cudaDeviceColor, color, sizeof(float) * 4 * maxNumParticles, cudaMemcpyHostToDevice);
 
-  printf("velField 69: %f %f\n", velField[68], velField[69]);
-
-
   // Initialize parameters in constant memory.  We didn't talk about
   // constant memory in class, but the use of read-only constant
   // memory here is an optimization over just sticking these values
@@ -555,18 +507,6 @@ SimRenderer::setup() {
   if (cudaerr != cudaSuccess)
       printf("kernelCreateLinkedList launch failed with error \"%s\".\n",
              cudaGetErrorString(cudaerr));
-
-  /*
-  // Also need to copy over the noise lookup tables, so we can
-  // implement noise on the GPU
-  int* permX;
-  int* permY;
-  float* value1D;
-  getNoiseTables(&permX, &permY, &value1D);
-  cudaMemcpyToSymbol(cuConstNoiseXPermutationTable, permX, sizeof(int) * 256);
-  cudaMemcpyToSymbol(cuConstNoiseYPermutationTable, permY, sizeof(int) * 256);
-  cudaMemcpyToSymbol(cuConstNoise1DValueTable, value1D, sizeof(float) * 256);
-  */
 }
 
 void
@@ -592,35 +532,28 @@ SimRenderer::allocOutputImage(int width, int height) {
 void
 SimRenderer::render() {
   cudaError_t cudaerr;
-  printf("IN RENDERER\n");
   // 256 threads per block is a healthy number
   dim3 blockDimVec(8, 8);
   dim3 gridDimVec(64, 64);
   dim3 blockDimParticles(256);
   dim3 gridDimParticles(16, 16);
 
-  cudaerr = cudaDeviceSynchronize();
-    if (cudaerr != cudaSuccess)
-        printf("kernelSpawnRandParticles launch failed with error \"%s\".\n",
-               cudaGetErrorString(cudaerr));
-
   float2* cudaDeviceVelFieldUpdated;
 
   cudaMalloc(&cudaDeviceVelFieldUpdated, sizeof(float) * 2 * image->width * image->height);
 
-  printf("IN RENDERER P2\n");
-
-  //kernelVecMomentum<<<gridDimVec, blockDimVec>>>(cudaDeviceVelFieldUpdated);
-  //cudaDeviceSynchronize();
-  //kernelVelFieldCopy<<<gridDimVec, blockDimVec>>>(cudaDeviceVelFieldUpdated);
+  //update momentum and copy the values accross whole frame
+  kernelVecMomentum<<<gridDimVec, blockDimVec>>>(cudaDeviceVelFieldUpdated);
+  cudaDeviceSynchronize();
+  kernelVelFieldCopy<<<gridDimVec, blockDimVec>>>(cudaDeviceVelFieldUpdated);
   cudaDeviceSynchronize();
 
-  for(int i = 0; i < 20; i++) {
+  //iteratively run divergence removal kernel
+  for(int i = 0; i < ITERS; i++) {
     kernelUpdateVectorField<<<gridDimVec, blockDimVec>>>(cudaDeviceVelFieldUpdated);
     cudaDeviceSynchronize();
     kernelVelFieldCopy<<<gridDimVec, blockDimVec>>>(cudaDeviceVelFieldUpdated);
     cudaDeviceSynchronize();
-    //cudaMemcpy(cuConstRendererParams.velField, cudaDeviceVelFieldUpdated, sizeof(float) * 2 * image->width * image->height, cudaMemcpyDeviceToDevice);
   }
 
   cudaFree(cudaDeviceVelFieldUpdated);
@@ -630,7 +563,7 @@ SimRenderer::render() {
         printf("vec field failed with error \"%s\".\n",
                cudaGetErrorString(cudaerr));
 
-
+  // if the kernel is dynamic (spawns particles), run the spawn particle function
   if(isDynamic && numSpawners != 0) {
     dim3 spawnGridDim(1);
     dim3 spawnBlockDim(numSpawners, 1);
@@ -646,10 +579,10 @@ SimRenderer::render() {
     else
       currParticleLast = new_cpl;
   }
-  if(currParticleIndex != currParticleLast) {
-    kernelRenderParticles<<<gridDimParticles, blockDimParticles>>>(currParticleIndex, currParticleLast);
-  }
-  //cudaDeviceSynchronize();
+
+  //render the particles
+  kernelRenderParticles<<<gridDimParticles, blockDimParticles>>>(currParticleIndex, currParticleLast);
+
   cudaerr = cudaDeviceSynchronize();
     if (cudaerr != cudaSuccess)
         printf("kernel launch failed with error \"%s\".\n",
