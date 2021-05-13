@@ -14,6 +14,6 @@ loadParticleScene(
   float*& position,
   float*& velField,
   float*& color,
-  bool& isDynamic);
+  int &maxNumParticles);
 
 #endif

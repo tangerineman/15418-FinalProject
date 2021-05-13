@@ -16,6 +16,8 @@ typedef struct float4 {
 
 void renderPicture();
 
+float avg = 0.f;
+float cnt = 0.f;
 
 static struct {
   int width;
@@ -136,7 +138,6 @@ renderPicture() {
 
   // render the particles< into the image
   gDisplay.renderer->render();
-  printf("DONE RENDERING\n");
 
   /*const Image* img = gDisplay.renderer->getImage();
   float4* data4 = (float4*) img->data;
@@ -150,10 +151,17 @@ renderPicture() {
 
   double endRenderTime = CycleTimer::currentSeconds();
 
+  cnt += 1;
+  if(avg == 0.f)
+    avg = 1000.f * (endRenderTime - endSimTime);
+  else
+    avg = (((cnt - 1) * avg) / cnt) + (1000.f * (endRenderTime - endSimTime)) / cnt;
+
   if (gDisplay.printStats) {
       printf("Clear:    %.3f ms\n", 1000.f * (endClearTime - startTime));
       printf("Advance:  %.3f ms\n", 1000.f * (endSimTime - endClearTime));
       printf("Render:   %.3f ms\n", 1000.f * (endRenderTime - endSimTime));
+      printf("Average:  %.3f ms\n", avg);
   }
 }
 
@@ -176,12 +184,8 @@ startRendererWithDisplay(SimRenderer* renderer) {
   printf("configurng glut...\n");
   glutInitWindowSize(gDisplay.width, gDisplay.height);
   glutInitDisplayMode(GLUT_RGBA | GLUT_DOUBLE);
-  printf("half...\n");
-  glutCreateWindow("CMU 15-418 Assignment 2 - Circle Renderer");
-  printf("half2...\n");
+  glutCreateWindow("CMU 15-418 Final Project - Particle Sim");
   glutDisplayFunc(handleDisplay);
-  printf("half3...\n");
   glutKeyboardFunc(handleKeyPress);
-  printf("almost...\n");
   glutMainLoop();
 }

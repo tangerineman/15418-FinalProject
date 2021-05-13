@@ -33,6 +33,8 @@ __device__ List* particleList;
 
 __device__ int deviceCurrNumParticles;
 int currNumParticles;
+
+// linked list initialization
 // returns empty linked list with just a head (head contains no information)
 __device__ List *linked_list_init(){
 
@@ -70,17 +72,15 @@ __device__ void insert_node(List* list, float x, float y, float r, float g, floa
   newNode->b = b;
   newNode->a = a; 
 
-//   if (list == NULL) printf("ERROR: NULL LIST IN INSERT_NODE\n");
-//   else if (list->tail == NULL) printf("ERROR: NULL LIST->NEXT IN INSERT_NODE\n");
   list->tail->next = newNode;
   list->tail = newNode;
   list->size++;
-  // printf("size = %d", list->size);
   return;
 
 }
 
 
+// adds new particle with specified info to the linked list
 __device__ void kernelAddParticle(float x, float y, float r, float g, float b, float a){
   
   if (blockIdx.x * blockDim.x + threadIdx.x == 0){
@@ -94,16 +94,11 @@ __device__ void kernelAddParticle(float x, float y, float r, float g, float b, f
 __global__ void kernelCreateLinkedList() {
  
   if (blockIdx.x * blockDim.x + threadIdx.x == 0) {
-    // printf("top of if\n");
     deviceCurrNumParticles = 0;
     List *newList = linked_list_init();
 
-    // printf("Newlist = %p\n", (void*)newList);
-    // printf("cuConstRendererParams.particleList = %p\n", particleList);
     particleList = newList;
-    
-    // printf("after init\n");
-    // printf("THREAD: %d\n", blockIdx.x * blockDim.x + threadIdx.x);
+
     float* positions = cuConstRendererParams.initial_positions;
     float* colors = cuConstRendererParams.initial_colors;
 
@@ -115,17 +110,15 @@ __global__ void kernelCreateLinkedList() {
       float2 pos = make_float2(positions[posIndex], positions[posIndex + 1]);
       float4 color = make_float4(colors[colIndex], colors[colIndex+1],
                                   colors[colIndex+2], colors[colIndex+3]);
-                  
-        
+          
       kernelAddParticle(pos.x, pos.y, color.x, color.y, color.z, color.w);
-    //   printf("size = %d\n", particleList->size);
+
     }
 
   }
-//   printf("done\n");
+
   return;
 }
-
 
 __device__ float *pickColor(int id){
   float *color = (float*)malloc(sizeof(float) * 4);
@@ -158,6 +151,7 @@ __device__ float *pickColor(int id){
 }
 
 
+// creates a particle at position x,y and adds it to the linked list
 __global__ void kernelSpawnParticle(float x, float y){
 
   if (blockIdx.x * blockDim.x + threadIdx.x == 0){
@@ -477,7 +471,7 @@ SimRenderer::~SimRenderer() {
     cudaFree(cudaDeviceColor);
     cudaFree(cudaDeviceImageData);
     kernelFreeLinkedList<<<1, 1>>>();
-    cudaFree(particleList);
+    // cudaFree(particleList);
   }
 
 }
@@ -501,7 +495,7 @@ SimRenderer::getImage() {
 
 void
 SimRenderer::loadScene(Benchmark bm, int maxArraySize) {
-    loadParticleScene(bm, maxArraySize, image->width, image->height, numParticles, numSpawners, spawners, position, velField, color, isDynamic);
+    loadParticleScene(bm, maxArraySize, image->width, image->height, numParticles, numSpawners, spawners, position, velField, color, maxNumParticles);
 }
 
 void
@@ -610,36 +604,32 @@ void
 SimRenderer::render() {
   cudaError_t cudaerr;
   printf("IN RENDERER\n");
-  // 256 threads per block is a healthy number
+
   dim3 blockDimVec(8, 8);
   dim3 gridDimVec(64, 64);
   dim3 blockDimParticles(256);
   dim3 gridDimParticles(16, 16);
 
   // spawn particles based on spawner locations
-  if (isDynamic){
-    for (int j = 0; j < numSpawners; j++){
-        // if (currNumParticles > maxNumParticles) break;
-        float newX = spawners[2 * j];
-        float newY = spawners[2 * j + 1];
-        kernelSpawnParticle<<<1, 1>>>(newX, newY);
-        currNumParticles++;
-        // printf("currNumParticles = %d\n", currNumParticles);
-        cudaerr = cudaDeviceSynchronize();
-        if (cudaerr != cudaSuccess)
-            printf("kernelSpawnParticle launch failed with error \"%s\".\n",
-                cudaGetErrorString(cudaerr));
-    }
-    
+  for (int j = 0; j < numSpawners; j++){
+      if (currNumParticles > maxNumParticles) break;
+      float newX = spawners[2 * j];
+      float newY = spawners[2 * j + 1];
+      kernelSpawnParticle<<<1, 1>>>(newX, newY);
+      currNumParticles++;
+      cudaerr = cudaDeviceSynchronize();
+      if (cudaerr != cudaSuccess)
+          printf("kernelSpawnParticle launch failed with error \"%s\".\n",
+              cudaGetErrorString(cudaerr));
   }
+    
+  
   
   
 
   float2* cudaDeviceVelFieldUpdated;
   
   cudaMalloc(&cudaDeviceVelFieldUpdated, sizeof(float) * 2 * image->width * image->height);
-
-  printf("IN RENDERER P2\n");
 
   kernelVecMomentum<<<gridDimVec, blockDimVec>>>(cudaDeviceVelFieldUpdated);
   cudaDeviceSynchronize();
@@ -651,7 +641,6 @@ SimRenderer::render() {
     cudaDeviceSynchronize();
     kernelVelFieldCopy<<<gridDimVec, blockDimVec>>>(cudaDeviceVelFieldUpdated);
     cudaDeviceSynchronize();
-    //cudaMemcpy(cuConstRendererParams.velField, cudaDeviceVelFieldUpdated, sizeof(float) * 2 * image->width * image->height, cudaMemcpyDeviceToDevice);
   }
 
   cudaFree(cudaDeviceVelFieldUpdated);
@@ -662,7 +651,6 @@ SimRenderer::render() {
                cudaGetErrorString(cudaerr));
 
   kernelRenderParticles<<<gridDimParticles, blockDimParticles>>>();
-  //cudaDeviceSynchronize();
   cudaerr = cudaDeviceSynchronize();
     if (cudaerr != cudaSuccess)
         printf("kernel launch failed with error \"%s\".\n",

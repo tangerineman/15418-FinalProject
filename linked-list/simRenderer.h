@@ -40,8 +40,6 @@ private:
 
     int numParticles;
     int maxNumParticles;
-
-    bool isDynamic;
     int numSpawners;
 
     int currParticleIndex;

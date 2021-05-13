@@ -21,27 +21,26 @@ void loadParticleScene(
     float*& position,
     float*& velField,
     float*& color,
-    bool& isDynamic
+    int& maxNumParticles
     )
 {
   printf("in loadParticleScene...\n");
   if (benchmark == STREAM1) {
-    numParticles = 2048;
+    numParticles = 1024;
     numSpawners = 0;
-
-    //TODO copy this
+    
     spawners = new float[2*numSpawners];
-    position = new float[2*maxArraySize];
+    position = new float[2*numParticles];
     velField = new float[2*width*height];
-    color = new float[4*maxArraySize];
+    color = new float[4*numParticles];
 
-    isDynamic = false;
+    maxNumParticles = maxArraySize;
 
     int stream_height = 5;
     int stream_start_y = (height-stream_height)/2;
     int stream_width = 245;
     
-    for(int i = 0; i < maxArraySize; i++) {
+    for(int i = 0; i < numParticles; i++) {
       int id2 = i * 2;
       int id4 = i * 4;
 
@@ -71,17 +70,17 @@ void loadParticleScene(
     numParticles = 2048;
     numSpawners = 0;
 
-    position = new float[2*maxArraySize];
+    position = new float[2*numParticles];
     velField = new float[2*width*height];
-    color = new float[4*maxArraySize];
+    color = new float[4*numParticles];
 
-    isDynamic = false;
+    maxNumParticles = maxArraySize;
 
     int stream_height = 5;
     int stream_start_y = (height-stream_height)/2;
     int stream_width = 245;
 
-    for(int i = 0; i < maxArraySize; i++) {
+    for(int i = 0; i < numParticles; i++) {
       int id2 = i * 2;
       int id4 = i * 4;
 
@@ -121,20 +120,20 @@ void loadParticleScene(
       }
     }
   } else if (benchmark == STREAM4) {
-    numParticles = 2048;
+    numParticles = 4096;
     numSpawners = 0;
 
-    position = new float[2*maxArraySize];
+    position = new float[2*numParticles];
     velField = new float[2*width*height];
-    color = new float[4*maxArraySize];
+    color = new float[4*numParticles];
 
-    isDynamic = false;
+    maxNumParticles = maxArraySize;
 
     int stream_height = 5;
     int stream_start_y = (height-stream_height)/2;
     int stream_width = 235;
 
-    for(int i = 0; i < maxArraySize; i++) {
+    for(int i = 0; i < numParticles; i++) {
       int id2 = i * 2;
       int id4 = i * 4;
 
@@ -199,7 +198,7 @@ void loadParticleScene(
     velField = new float[2*width*height];
     color = new float[4*maxArraySize];
 
-    isDynamic = false;
+    maxNumParticles = maxArraySize;
 
     for(int i = 0; i < maxArraySize; i++) {
       int id2 = i * 2;
@@ -262,16 +261,16 @@ void loadParticleScene(
 
 
   } else if (benchmark == BLACKHOLE){
-    numParticles = 1024;
+    numParticles = 8192;
     numSpawners = 0;
 
-    position = new float[2*maxArraySize];
+    position = new float[2*numParticles];
     velField = new float[2*width*height];
-    color = new float[4*maxArraySize];
+    color = new float[4*numParticles];
 
-    isDynamic = false;
+    maxNumParticles = maxArraySize;
 
-    for(int i = 0; i < maxArraySize; i++) {
+    for(int i = 0; i < numParticles; i++) {
       int id2 = i * 2;
       int id4 = i * 4;
 
@@ -328,13 +327,13 @@ void loadParticleScene(
 
       numParticles = 0;
 
-      color = new float[4*maxArraySize];
+      color = new float[4*numParticles];
       velField = new float[2*width*height];
 
       numSpawners = 8;
-      position = new float[2 * maxArraySize];
+      position = new float[2 * numParticles];
       spawners = new float[2 * numSpawners];
-      isDynamic = true;
+      maxNumParticles = maxArraySize;
 
       float centerOffset = 100.f;
       float centerX = (float)(width / 2);
@@ -366,15 +365,15 @@ void loadParticleScene(
       spawners[15] = centerY;
 
 
-      float vecScale = 600.f;
+      float vecScale = -1.f;
       for(int j = 0; j < height; j++) {
         for(int k = 0; k < width; k++) {
 
           float offsetX = (float)k - centerX;
           float offsetY = (float)j - centerY;
 
-          velField[(j*width + k) * 2] = vecScale * sin(offsetX + offsetY);
-          velField[(j*width + k) * 2 + 1] = vecScale * cos(offsetX - offsetY);
+          velField[(j*width + k) * 2] = vecScale * offsetX;
+          velField[(j*width + k) * 2 + 1] = vecScale * offsetY;
         }
       }
 
@@ -385,13 +384,13 @@ void loadParticleScene(
 
       numParticles = 0;
 
-      color = new float[4*maxArraySize];
+      color = new float[4*numParticles];
       velField = new float[2*width*height];
 
       numSpawners = 8;
-      position = new float[2 * maxArraySize];
+      position = new float[2 * numParticles];
       spawners = new float[2 * numSpawners];
-      isDynamic = true;
+      maxNumParticles = maxArraySize;
 
       float centerOffset = 50.f;
       float centerX = (float)(width / 2);
